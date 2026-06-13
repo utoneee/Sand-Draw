@@ -127,15 +127,14 @@
   <div id="progressWrap"><div id="progressBar"></div></div>
 
   <div class="row" id="stickerRow"><div class="label">① 撕貼紙（選一層貼上）</div></div>
-  <div class="row" id="colorRow"><div class="label">② 選沙的顏色</div></div>
+  <div class="row" id="colorRow"><div class="label">② 點顏色 → 在中央倒一堆沙</div></div>
 
   <div class="row">
-    <button class="primary" id="scoopBtn">加沙</button>
     <button id="dumpBtn">倒掉散沙</button>
     <button id="tiltBtn">啟用傾斜</button>
     <button id="resetBtn">重來</button>
   </div>
-  <div class="hint" id="hint">③ 按「加沙」倒沙進盤 · 傾斜 iPad 讓沙滑過膠水 · 填好按「倒掉散沙」換下一色</div>
+  <div class="hint" id="hint">③ 傾斜 iPad 讓沙滑過膠水黏住 · 填好按「倒掉散沙」換下一色</div>
 </div>
 
 <script>
@@ -147,14 +146,16 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;          // 內部邏輯解析度
 const MAX_PARTICLES = 340;       // 盤上散沙上限（少而胖）
-const SCOOP_AMOUNT = 130;        // 按一次「加沙」倒下的沙量
+const SCOOP_AMOUNT = 130;        // 點一次顏色倒下的沙量
 const STICK_CHANCE = 0.16;       // 黏附機率（沙滑過膠水時黏住的機率）
-const ACCEL = 0.35;              // 重力加速係數
-const DAMP = 0.97;               // 速度阻尼
-const MAX_SPEED = 3.2;           // 最大速度
+const ACCEL = 0.5;               // 重力加速係數（大一點＝有重量感）
+const DAMP = 0.9;                // 速度阻尼（低一點＝不飄、會停下堆積）
+const MAX_SPEED = 5;             // 最大速度
 const WIN_RATIO = 0.85;          // 過關門檻（已貼圖層的填滿比）
+const BG_COLOR = '#e9dcc2';      // 淺暖米色盤底
 
-const SAND_COLORS = ['#e7c08a', '#d23b3b', '#4caf50', '#e0c84a', '#5aa9e6', '#b07be0', '#f3ece0'];
+// 深色開頭，淺底上才看得清；對應蘋果各部位
+const SAND_COLORS = ['#262626', '#d23b3b', '#4caf50', '#7a4a22', '#e7c08a', '#e0c84a', '#5aa9e6'];
 
 // ─────────────────────────────────────────────────────────────
 // 圖層定義：蘋果。path() 只畫幾何，描邊/填色由呼叫端決定
@@ -261,14 +262,15 @@ class LayerManager {
 // ─────────────────────────────────────────────────────────────
 class ParticleSystem {
   constructor() { this.list = []; }
-  // 從畫面頂部倒一把散沙下來
+  // 在畫面正中央倒一堆散沙
   scoop(color, n) {
     for (let i = 0; i < n && this.list.length < MAX_PARTICLES; i++) {
+      const a = Math.random() * 7, rr = Math.random() * 46;
       this.list.push({
-        x: 20 + Math.random() * (W - 40),
-        y: 4 + Math.random() * 26,
-        vx: (Math.random() - 0.5) * 1.2,
-        vy: Math.random() * 1.2,
+        x: W / 2 + Math.cos(a) * rr,
+        y: H / 2 + Math.sin(a) * rr,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
         r: 3 + Math.random() * 2,            // 3~5px 胖沙粒
         c: color,
       });
@@ -367,7 +369,7 @@ const layers = new LayerManager();
 const particles = new ParticleSystem();
 const input = new InputManager();
 
-bgCtx.fillStyle = '#1a1208';
+bgCtx.fillStyle = BG_COLOR;
 bgCtx.fillRect(0, 0, W, H);
 
 // 重畫已貼貼紙（淡色填 + 描邊輪廓，像撕下的貼紙）
@@ -375,10 +377,10 @@ function redrawStickers() {
   stickerCtx.clearRect(0, 0, W, H);
   LAYERS.forEach((layer, i) => {
     if (!layers.placed.has(i + 1)) return;
-    renderLayer(stickerCtx, layer, layer.color, 0.22);          // 淡淡的填色提示
+    renderLayer(stickerCtx, layer, layer.color, 0.3);           // 膠水區的填色提示
     // 外圈描邊
     stickerCtx.save();
-    stickerCtx.globalAlpha = 0.7;
+    stickerCtx.globalAlpha = 0.85;
     stickerCtx.strokeStyle = layer.color;
     stickerCtx.lineWidth = layer.mode === 'stroke' ? layer.lw : 2.5;
     stickerCtx.setLineDash(layer.mode === 'stroke' ? [] : [6, 5]);
@@ -414,6 +416,7 @@ SAND_COLORS.forEach((col, i) => {
     selectedColor = col;
     colorRow.querySelectorAll('.swatch').forEach(el => el.classList.remove('sel'));
     s.classList.add('sel');
+    particles.scoop(col, SCOOP_AMOUNT);   // 點顏色＝選色＋在中央倒一堆沙
   });
   colorRow.appendChild(s);
 });
@@ -440,9 +443,6 @@ function loop() {
 loop();
 
 // 控制鈕
-document.getElementById('scoopBtn').addEventListener('click', () => {
-  particles.scoop(selectedColor, SCOOP_AMOUNT);
-});
 document.getElementById('dumpBtn').addEventListener('click', () => {
   particles.clear();   // 清掉盤上的散沙（已黏住的不受影響）
 });
