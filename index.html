@@ -33,7 +33,13 @@
     gap: 10px;
     padding: env(safe-area-inset-top, 6px) 8px env(safe-area-inset-bottom, 6px);
   }
-  header { text-align: center; }
+  header { text-align: center; position: relative; width: min(80vmin, 460px); }
+  .backBtn {
+    position: absolute; left: 0; top: 0;
+    font-size: 12px; padding: 6px 10px; border-radius: 10px;
+    background: var(--panel); color: var(--text);
+    border: 1px solid rgba(232,185,107,.25);
+  }
   header h1 { font-size: 19px; letter-spacing: 1px; color: var(--gold); font-weight: 600; }
   header .sub { font-size: 11px; letter-spacing: 3px; color: var(--accent); margin-top: 2px; opacity: .85; }
 
@@ -131,6 +137,7 @@
 <body>
 <div id="app" class="picking">
   <header>
+    <button id="changeBtn" class="gameUi backBtn">← 換圖案</button>
     <h1>沙畫遊戲</h1>
     <div class="sub">PEEL · POUR · PAINT</div>
   </header>
@@ -160,7 +167,6 @@
   <div class="row gameUi">
     <button id="dumpBtn">倒掉散沙</button>
     <button id="tiltBtn">啟用傾斜</button>
-    <button id="pickBtn">換圖案</button>
   </div>
   <div class="hint gameUi" id="hint">③ 傾斜 iPad 讓沙滑過膠水黏住 · 填好按「倒掉散沙」換下一色</div>
 </div>
@@ -585,7 +591,11 @@ loop();
 
 // 控制鈕
 document.getElementById('dumpBtn').addEventListener('click', () => particles.clear());
-document.getElementById('pickBtn').addEventListener('click', showPicker);
+document.getElementById('changeBtn').addEventListener('click', () => {
+  // 已經有沙黏上去才確認，避免把作品清掉；沒進度就直接換
+  if (layers && layers.covered() > 0 && !confirm('要換圖案嗎？目前的作品會清掉。')) return;
+  showPicker();
+});
 document.getElementById('tiltBtn').addEventListener('click', async (e) => {
   const ok = await input.enableTilt();
   document.getElementById('hint').textContent =
