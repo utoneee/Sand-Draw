@@ -130,10 +130,12 @@
   <div class="row" id="colorRow"><div class="label">② 選沙的顏色</div></div>
 
   <div class="row">
-    <button class="primary" id="tiltBtn">啟用傾斜</button>
-    <button id="resetBtn">清空重來</button>
+    <button class="primary" id="scoopBtn">加沙</button>
+    <button id="dumpBtn">倒掉散沙</button>
+    <button id="tiltBtn">啟用傾斜</button>
+    <button id="resetBtn">重來</button>
   </div>
-  <div class="hint" id="hint">③ 按住畫面倒沙 · 傾斜 iPad 把沙鋪進貼紙</div>
+  <div class="hint" id="hint">③ 按「加沙」倒沙進盤 · 傾斜 iPad 讓沙滑過膠水 · 填好按「倒掉散沙」換下一色</div>
 </div>
 
 <script>
@@ -144,9 +146,9 @@
 // 設定
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;          // 內部邏輯解析度
-const MAX_PARTICLES = 340;       // 同時移動的沙粒上限（少而胖）
-const POUR_RATE = 7;             // 按住時每幀倒出的沙量（一坨持續流）
-const STICK_CHANCE = 0.16;       // 黏附機率
+const MAX_PARTICLES = 340;       // 盤上散沙上限（少而胖）
+const SCOOP_AMOUNT = 130;        // 按一次「加沙」倒下的沙量
+const STICK_CHANCE = 0.16;       // 黏附機率（沙滑過膠水時黏住的機率）
 const ACCEL = 0.35;              // 重力加速係數
 const DAMP = 0.97;               // 速度阻尼
 const MAX_SPEED = 3.2;           // 最大速度
@@ -259,11 +261,12 @@ class LayerManager {
 // ─────────────────────────────────────────────────────────────
 class ParticleSystem {
   constructor() { this.list = []; }
-  pour(x, y, n, color) {
+  // 從畫面頂部倒一把散沙下來
+  scoop(color, n) {
     for (let i = 0; i < n && this.list.length < MAX_PARTICLES; i++) {
       this.list.push({
-        x: x + (Math.random() - 0.5) * 18,
-        y: y + (Math.random() - 0.5) * 18,
+        x: 20 + Math.random() * (W - 40),
+        y: 4 + Math.random() * 26,
         vx: (Math.random() - 0.5) * 1.2,
         vy: Math.random() * 1.2,
         r: 3 + Math.random() * 2,            // 3~5px 胖沙粒
@@ -280,8 +283,11 @@ class ParticleSystem {
       const sp = Math.hypot(s.vx, s.vy);
       if (sp > MAX_SPEED) { s.vx = s.vx / sp * MAX_SPEED; s.vy = s.vy / sp * MAX_SPEED; }
       s.x += s.vx; s.y += s.vy;
-      if (s.x < 0) s.x += W; else if (s.x >= W) s.x -= W;
-      if (s.y < 0) s.y += H; else if (s.y >= H) s.y -= H;
+      // 撞到邊緣就停住、堆積（不環繞），像真的沙堆在牆角
+      if (s.x < s.r) { s.x = s.r; s.vx = 0; }
+      else if (s.x > W - s.r) { s.x = W - s.r; s.vx = 0; }
+      if (s.y < s.r) { s.y = s.r; s.vy = 0; }
+      else if (s.y > H - s.r) { s.y = H - s.r; s.vy = 0; }
       if (layers.maskAt(s.x, s.y) && Math.random() < STICK_CHANCE) {
         layers.stamp(s.x, s.y, s.r);
         stuckCtx.fillStyle = s.c;
@@ -381,28 +387,6 @@ function redrawStickers() {
   });
 }
 
-// 座標換算
-function toLogical(clientX, clientY) {
-  const rect = stage.getBoundingClientRect();
-  return {
-    x: (clientX - rect.left) / rect.width * W,
-    y: (clientY - rect.top) / rect.height * H,
-  };
-}
-
-// 倒沙：按住持續倒
-let pouring = false, pourPos = { x: 0, y: 0 };
-main.addEventListener('pointerdown', e => {
-  pouring = true; const p = toLogical(e.clientX, e.clientY); pourPos = p;
-  main.setPointerCapture(e.pointerId);
-});
-main.addEventListener('pointermove', e => {
-  if (pouring) pourPos = toLogical(e.clientX, e.clientY);
-});
-const stopPour = () => { pouring = false; };
-main.addEventListener('pointerup', stopPour);
-main.addEventListener('pointercancel', stopPour);
-
 // 沙色
 let selectedColor = SAND_COLORS[0];
 
@@ -440,8 +424,6 @@ const hint = document.getElementById('hint');
 let won = false;
 
 function loop() {
-  if (pouring) particles.pour(pourPos.x, pourPos.y, POUR_RATE, selectedColor);
-
   const g = input.gravity();
   particles.step(g.x, g.y, layers, stuckCtx);
 
@@ -458,6 +440,12 @@ function loop() {
 loop();
 
 // 控制鈕
+document.getElementById('scoopBtn').addEventListener('click', () => {
+  particles.scoop(selectedColor, SCOOP_AMOUNT);
+});
+document.getElementById('dumpBtn').addEventListener('click', () => {
+  particles.clear();   // 清掉盤上的散沙（已黏住的不受影響）
+});
 document.getElementById('tiltBtn').addEventListener('click', async (e) => {
   const ok = await input.enableTilt();
   hint.textContent = ok ? '傾斜已啟用 · 按住畫面倒沙' : '此裝置不支援傾斜，改用預設向下重力';
