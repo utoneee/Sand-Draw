@@ -113,10 +113,24 @@
   }
   .pick:active { transform: scale(.93); }
   .pick canvas { width: 80px; height: 80px; }
+
+  /* 選圖案時隱藏遊戲 UI，避免和選單重疊 */
+  #app.picking .gameUi { display: none; }
+
+  /* 完成提示：上方小膠囊，不蓋住作品 */
+  #winBanner {
+    position: absolute; top: 10px; left: 50%;
+    transform: translate(-50%, -20px);
+    background: rgba(40,28,12,.88); color: var(--gold);
+    padding: 8px 16px; border-radius: 20px; font-size: 12px;
+    opacity: 0; transition: opacity .4s, transform .4s;
+    pointer-events: none; z-index: 6; max-width: 92%; text-align: center;
+  }
+  #winBanner.show { opacity: 1; transform: translate(-50%, 0); }
 </style>
 </head>
 <body>
-<div id="app">
+<div id="app" class="picking">
   <header>
     <h1>沙畫遊戲</h1>
     <div class="sub">PEEL · POUR · PAINT</div>
@@ -124,9 +138,9 @@
 
   <div id="stage">
     <canvas id="bg"></canvas>
-    <canvas id="lineart"></canvas>
     <canvas id="glue"></canvas>
     <canvas id="stuck"></canvas>
+    <canvas id="lineart"></canvas>
     <canvas id="main"></canvas>
 
     <!-- 選圖案 -->
@@ -135,25 +149,21 @@
       <div class="pickRow" id="pickRow"></div>
     </div>
 
-    <!-- 完成 -->
-    <div class="overlay" id="winOverlay">
-      <div class="big">✨ 完成！</div>
-      <div class="small">圖案顯現了</div>
-      <button class="primary" id="againBtn">換個圖案</button>
-    </div>
+    <!-- 完成：上方小提示，不蓋住作品 -->
+    <div id="winBanner"><span>✨ 完成！慢慢欣賞 · 想換圖案按下方「換圖案」</span></div>
   </div>
 
-  <div id="progressWrap"><div id="progressBar"></div></div>
+  <div id="progressWrap" class="gameUi"><div id="progressBar"></div></div>
 
-  <div class="row" id="peelRow"><div class="label">① 撕膠膜（露出黏貼處）</div></div>
-  <div class="row" id="colorRow"><div class="label">② 點顏色 → 在中央倒一堆沙</div></div>
+  <div class="row gameUi" id="peelRow"><div class="label">① 撕膠膜（露出黏貼處）</div></div>
+  <div class="row gameUi" id="colorRow"><div class="label">② 點顏色 → 在中央倒一堆沙</div></div>
 
-  <div class="row">
+  <div class="row gameUi">
     <button id="dumpBtn">倒掉散沙</button>
     <button id="tiltBtn">啟用傾斜</button>
     <button id="pickBtn">換圖案</button>
   </div>
-  <div class="hint" id="hint">③ 傾斜 iPad 讓沙滑過膠水黏住 · 填好按「倒掉散沙」換下一色</div>
+  <div class="hint gameUi" id="hint">③ 傾斜 iPad 讓沙滑過膠水黏住 · 填好按「倒掉散沙」換下一色</div>
 </div>
 
 <script>
@@ -171,7 +181,9 @@ const ACCEL = 0.85;
 const DAMP = 0.84;
 const MAX_SPEED = 6.5;
 const WIN_RATIO = 0.85;
-const BG_COLOR = '#e9dcc2';
+const OUTSIDE_COLOR = '#6b5638';   // 圖案外圍（不能填的部分）底色
+const FILM_GRAY = '#9c9587';       // 未撕膜的貼紙（灰）
+const PEELED_WHITE = '#fcf8f0';    // 撕掉膠膜後露出的白色黏貼面
 const LINE_COLOR = '#3a2a1a';
 
 const SAND_COLORS = ['#262626', '#d23b3b', '#4caf50', '#7a4a22', '#e7c08a', '#f2cf3e', '#5aa9e6'];
@@ -408,7 +420,7 @@ const glueCtx = glueCv.getContext('2d');
 const stuckCtx = stuck.getContext('2d');
 const mainCtx = main.getContext('2d');
 
-bgCtx.fillStyle = BG_COLOR;
+bgCtx.fillStyle = OUTSIDE_COLOR;
 bgCtx.fillRect(0, 0, W, H);
 
 const particles = new ParticleSystem();
@@ -421,16 +433,16 @@ let won = false;
 function drawLineart(pattern) {
   lineartCtx.clearRect(0, 0, W, H);
   pattern.regions.forEach(region => {
-    paintRegion(lineartCtx, region, { color: LINE_COLOR, stroke: true, lw: region.stroke ? (region.lw || 9) : 3 });
+    paintRegion(lineartCtx, region, { color: LINE_COLOR, stroke: true, lw: 3 });
   });
 }
-// 重畫已撕膜區塊的膠水（淡色填，提示可填處）
-function redrawGlue() {
+// 畫貼紙板：未撕膜＝灰、撕掉＝白（沙黏在白色面上）
+function drawBoard() {
   glueCtx.clearRect(0, 0, W, H);
   if (!layers) return;
   layers.regions.forEach((region, i) => {
-    if (!layers.peeled.has(i + 1)) return;
-    paintRegion(glueCtx, region, { color: region.color, alpha: 0.32 });
+    const peeled = layers.peeled.has(i + 1);
+    paintRegion(glueCtx, region, { color: peeled ? PEELED_WHITE : FILM_GRAY });
   });
 }
 
@@ -445,7 +457,7 @@ function buildPeelRow(pattern) {
     b.addEventListener('click', () => {
       layers.peel(i + 1);
       b.classList.add('peeled');
-      redrawGlue();
+      drawBoard();
     });
     peelRow.appendChild(b);
   });
@@ -469,7 +481,8 @@ SAND_COLORS.forEach((col, i) => {
 // 選圖案畫面：縮圖
 const pickRow = document.getElementById('pickRow');
 const pickOverlay = document.getElementById('pickOverlay');
-const winOverlay = document.getElementById('winOverlay');
+const winBanner = document.getElementById('winBanner');
+const appEl = document.getElementById('app');
 Object.keys(PATTERNS).forEach(key => {
   const pat = PATTERNS[key];
   const wrap = document.createElement('div');
@@ -477,8 +490,8 @@ Object.keys(PATTERNS).forEach(key => {
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const cx = cv.getContext('2d');
-  pat.regions.forEach(r => paintRegion(cx, r, { color: r.color, alpha: 0.9 }));
-  pat.regions.forEach(r => paintRegion(cx, r, { color: LINE_COLOR, stroke: true, lw: r.stroke ? (r.lw || 9) : 3 }));
+  pat.regions.forEach(r => paintRegion(cx, r, { color: r.color, alpha: 0.95 }));
+  pat.regions.forEach(r => paintRegion(cx, r, { color: LINE_COLOR, stroke: true, lw: 3 }));
   wrap.appendChild(cv);
   wrap.title = pat.name;
   wrap.addEventListener('click', () => startPattern(key));
@@ -491,19 +504,21 @@ function startPattern(key) {
   particles.clear();
   stuckCtx.clearRect(0, 0, W, H);
   mainCtx.clearRect(0, 0, W, H);
-  glueCtx.clearRect(0, 0, W, H);
-  drawLineart(PATTERNS[key]);
   buildPeelRow(PATTERNS[key]);
+  drawLineart(PATTERNS[key]);
+  drawBoard();
   won = false;
-  winOverlay.classList.remove('show');
+  winBanner.classList.remove('show');
   pickOverlay.classList.remove('show');
+  appEl.classList.remove('picking');
   document.getElementById('progressBar').style.width = '0%';
 }
 
 // 回到選圖案
 function showPicker() {
   pickOverlay.classList.add('show');
-  winOverlay.classList.remove('show');
+  winBanner.classList.remove('show');
+  appEl.classList.add('picking');
 }
 
 // 主迴圈
@@ -517,7 +532,7 @@ function loop() {
     const r = layers.ratio();
     progressBar.style.width = (r * 100).toFixed(0) + '%';
     if (!won && layers.allPeeled() && r >= WIN_RATIO) {
-      won = true; winOverlay.classList.add('show');
+      won = true; winBanner.classList.add('show');
     }
   }
   requestAnimationFrame(loop);
@@ -527,7 +542,6 @@ loop();
 // 控制鈕
 document.getElementById('dumpBtn').addEventListener('click', () => particles.clear());
 document.getElementById('pickBtn').addEventListener('click', showPicker);
-document.getElementById('againBtn').addEventListener('click', showPicker);
 document.getElementById('tiltBtn').addEventListener('click', async (e) => {
   const ok = await input.enableTilt();
   document.getElementById('hint').textContent =
