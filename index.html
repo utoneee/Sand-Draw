@@ -275,6 +275,8 @@ class LayerManager {
     this.filled   = new Uint8Array(W * H);
     this.peeled   = new Set();                // 已撕膜的區塊 id (1..n)
     this.pxCount  = [0];
+    this.coveredCount = 0;                     // 已填像素數（增量維護，免每幀全掃）
+    this.totalCount = 0;                       // 已撕區塊的總像素數
     this._build();
   }
   _build() {
@@ -291,14 +293,13 @@ class LayerManager {
     });
     for (let p = 0; p < W * H; p++) { const r = this.regionId[p]; if (r) this.pxCount[r]++; }
   }
-  peel(rid) { this.peeled.add(rid); }
-  total() { let t = 0; this.peeled.forEach(r => t += this.pxCount[r]); return t; }
-  covered() {
-    let c = 0;
-    for (let p = 0; p < W * H; p++) if (this.filled[p] && this.peeled.has(this.regionId[p])) c++;
-    return c;
+  peel(rid) {
+    if (this.peeled.has(rid)) return;          // 防止重複撕導致總數重複累加
+    this.peeled.add(rid);
+    this.totalCount += this.pxCount[rid];
   }
-  ratio() { const t = this.total(); return t ? this.covered() / t : 0; }
+  covered() { return this.coveredCount; }
+  ratio() { return this.totalCount ? this.coveredCount / this.totalCount : 0; }
   allPeeled() { return this.peeled.size === this.regions.length; }
   maskAt(x, y) {
     if (x < 0 || y < 0 || x >= W || y >= H) return 0;
@@ -315,7 +316,9 @@ class LayerManager {
         const dx = xx - x, dy = yy - y;
         if (dx * dx + dy * dy > r2) continue;
         const p = yy * W + xx;
-        if (this.regionId[p] && this.peeled.has(this.regionId[p]) && !this.filled[p]) this.filled[p] = 1;
+        if (this.regionId[p] && this.peeled.has(this.regionId[p]) && !this.filled[p]) {
+          this.filled[p] = 1; this.coveredCount++;
+        }
       }
   }
 }
@@ -368,7 +371,7 @@ class ParticleSystem {
   }
   // 空間網格做鄰近沙粒分離，避免重疊、形成沙堆
   _separate() {
-    const cs = 11, cols = Math.ceil(W / cs);
+    const cs = 11;
     const buckets = new Map();
     const key = (cx, cy) => cx * 100000 + cy;
     const L = this.list;
@@ -481,7 +484,6 @@ bgCtx.fillRect(0, 0, W, H);
 const particles = new ParticleSystem();
 const input = new InputManager();
 let layers = null;
-let selectedColor = SAND_COLORS[0];
 let won = false;
 
 // 畫貼紙板：未撕膜＝灰、撕掉＝淺米灰；並畫出刀模線（區塊分界）
@@ -526,7 +528,6 @@ SAND_COLORS.forEach((col, i) => {
   s.className = 'swatch' + (i === 0 ? ' sel' : '');
   s.style.background = col;
   s.addEventListener('click', () => {
-    selectedColor = col;
     colorRow.querySelectorAll('.swatch').forEach(el => el.classList.remove('sel'));
     s.classList.add('sel');
     particles.scoop(col, SCOOP_AMOUNT);
