@@ -146,17 +146,19 @@
     <canvas id="bg"></canvas>
     <canvas id="glue"></canvas>
     <canvas id="stuck"></canvas>
-    <canvas id="lineart"></canvas>
     <canvas id="main"></canvas>
 
-    <!-- 選圖案 -->
+    <!-- 開始畫面：先啟用傾斜，再選圖案 -->
     <div class="overlay show" id="pickOverlay">
-      <div class="big">選一個圖案</div>
+      <div class="small">① 先啟用傾斜（iPad 必要）</div>
+      <button id="tiltBtn" class="pickBtn">啟用傾斜</button>
+      <div class="small" id="tiltStatus">　</div>
+      <div class="big">② 選一個圖案</div>
       <div class="pickRow" id="pickRow"></div>
     </div>
 
     <!-- 完成：上方小提示，不蓋住作品 -->
-    <div id="winBanner"><span>✨ 完成！慢慢欣賞 · 想換圖案按下方「換圖案」</span></div>
+    <div id="winBanner"><span>✨ 完成！慢慢欣賞 · 想換就按左上角「換圖案」</span></div>
   </div>
 
   <div id="progressWrap" class="gameUi"><div id="progressBar"></div></div>
@@ -166,7 +168,6 @@
 
   <div class="row gameUi">
     <button id="dumpBtn">倒掉散沙</button>
-    <button id="tiltBtn">啟用傾斜</button>
   </div>
   <div class="hint gameUi" id="hint">③ 傾斜 iPad 讓沙滑過膠水黏住 · 填好按「倒掉散沙」換下一色</div>
 </div>
@@ -191,7 +192,6 @@ const WIN_RATIO = 0.85;
 const OUTSIDE_COLOR = '#6b5638';   // 圖案外圍（不能填的部分）底色
 const FILM_GRAY = '#9c9587';       // 未撕膜的貼紙（灰）
 const PEELED_WHITE = '#fcf8f0';    // 撕掉膠膜後露出的白色黏貼面
-const LINE_COLOR = '#3a2a1a';
 
 const SAND_COLORS = ['#262626', '#d23b3b', '#4caf50', '#7a4a22', '#e7c08a', '#f2cf3e', '#5aa9e6'];
 
@@ -465,13 +465,11 @@ class InputManager {
 // ─────────────────────────────────────────────────────────────
 const stage = document.getElementById('stage');
 const bg = document.getElementById('bg');
-const lineartCv = document.getElementById('lineart');
 const glueCv = document.getElementById('glue');
 const stuck = document.getElementById('stuck');
 const main = document.getElementById('main');
-[bg, lineartCv, glueCv, stuck, main].forEach(c => { c.width = W; c.height = H; });
+[bg, glueCv, stuck, main].forEach(c => { c.width = W; c.height = H; });
 const bgCtx = bg.getContext('2d');
-const lineartCtx = lineartCv.getContext('2d');
 const glueCtx = glueCv.getContext('2d');
 const stuckCtx = stuck.getContext('2d');
 const mainCtx = main.getContext('2d');
@@ -485,13 +483,6 @@ let layers = null;
 let selectedColor = SAND_COLORS[0];
 let won = false;
 
-// 畫線稿（整個圖案的封閉線條，一開始就全顯示）
-function drawLineart(pattern) {
-  lineartCtx.clearRect(0, 0, W, H);
-  pattern.regions.forEach(region => {
-    paintRegion(lineartCtx, region, { color: LINE_COLOR, stroke: true, lw: 3 });
-  });
-}
 // 畫貼紙板：未撕膜＝灰、撕掉＝白（沙黏在白色面上）
 function drawBoard() {
   glueCtx.clearRect(0, 0, W, H);
@@ -555,7 +546,6 @@ function startPattern(key) {
   stuckCtx.clearRect(0, 0, W, H);
   mainCtx.clearRect(0, 0, W, H);
   buildPeelRow(PATTERNS[key]);
-  drawLineart(PATTERNS[key]);
   drawBoard();
   won = false;
   winBanner.classList.remove('show');
@@ -598,9 +588,9 @@ document.getElementById('changeBtn').addEventListener('click', () => {
 });
 document.getElementById('tiltBtn').addEventListener('click', async (e) => {
   const ok = await input.enableTilt();
-  document.getElementById('hint').textContent =
-    ok ? '傾斜已啟用 · 點顏色加沙 → 傾斜滑過膠水' : '此裝置不支援傾斜，改用預設向下重力';
-  if (ok) e.target.textContent = '傾斜中';
+  document.getElementById('tiltStatus').textContent =
+    ok ? '✓ 傾斜已啟用' : '此裝置不支援傾斜，將用方向鍵／預設重力';
+  if (ok) { e.target.textContent = '傾斜已啟用'; e.target.disabled = true; e.target.style.opacity = .55; }
 });
 
 })();
