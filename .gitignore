@@ -1,0 +1,6 @@
+# 備份與過程檔只存本機，不推送
+沙畫遊戲-v*.html
+*.docx
+~$*
+.DS_Store
+Thumbs.db
