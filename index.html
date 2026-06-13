@@ -30,17 +30,17 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    padding: env(safe-area-inset-top, 8px) 8px env(safe-area-inset-bottom, 8px);
+    gap: 10px;
+    padding: env(safe-area-inset-top, 6px) 8px env(safe-area-inset-bottom, 6px);
   }
   header { text-align: center; }
-  header h1 { font-size: 20px; letter-spacing: 1px; color: var(--gold); font-weight: 600; }
-  header .sub { font-size: 12px; letter-spacing: 3px; color: var(--accent); margin-top: 2px; opacity: .85; }
+  header h1 { font-size: 19px; letter-spacing: 1px; color: var(--gold); font-weight: 600; }
+  header .sub { font-size: 11px; letter-spacing: 3px; color: var(--accent); margin-top: 2px; opacity: .85; }
 
   #stage {
     position: relative;
-    width: min(86vmin, 480px);
-    height: min(86vmin, 480px);
+    width: min(80vmin, 460px);
+    height: min(80vmin, 460px);
     border-radius: 18px;
     overflow: hidden;
     box-shadow: 0 10px 40px rgba(0,0,0,.5), inset 0 0 0 1px rgba(232,185,107,.15);
@@ -48,8 +48,8 @@
   #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   #progressWrap {
-    width: min(86vmin, 480px);
-    height: 12px;
+    width: min(80vmin, 460px);
+    height: 10px;
     background: var(--panel);
     border-radius: 8px;
     overflow: hidden;
@@ -61,17 +61,38 @@
     transition: width .15s ease-out;
   }
 
-  #controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  /* 貼紙列 */
+  .row { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  .label { font-size: 11px; color: var(--accent); opacity: .8; width: 100%; text-align: center; margin-bottom: -2px; }
+  .sticker {
+    font-size: 13px; color: var(--text);
+    background: var(--panel); border: 1px solid rgba(232,185,107,.25);
+    padding: 7px 12px; border-radius: 11px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; transition: transform .08s, opacity .15s;
+  }
+  .sticker:active { transform: scale(.94); }
+  .sticker .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .sticker.placed { opacity: .45; }
+  .sticker.placed::after { content: '✓'; color: var(--gold); font-size: 12px; }
+
+  /* 顏色盤 */
+  .swatch {
+    width: 30px; height: 30px; border-radius: 50%;
+    cursor: pointer; border: 2px solid transparent; transition: transform .08s;
+  }
+  .swatch:active { transform: scale(.9); }
+  .swatch.sel { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(232,185,107,.4); }
+
   button {
-    font-family: inherit; font-size: 14px;
+    font-family: inherit; font-size: 13px;
     color: var(--text); background: var(--panel);
     border: 1px solid rgba(232,185,107,.25);
-    padding: 9px 16px; border-radius: 12px;
+    padding: 8px 14px; border-radius: 11px;
     cursor: pointer; transition: transform .08s, background .15s;
   }
   button:active { transform: scale(.95); }
   button.primary { background: var(--accent); color: #fff; border-color: transparent; }
-  .hint { font-size: 12px; color: var(--accent); opacity: .8; min-height: 16px; text-align: center; }
+  .hint { font-size: 11px; color: var(--accent); opacity: .85; min-height: 15px; text-align: center; }
 
   #win {
     position: absolute; inset: 0;
@@ -93,6 +114,7 @@
 
   <div id="stage">
     <canvas id="bg"></canvas>
+    <canvas id="sticker"></canvas>
     <canvas id="stuck"></canvas>
     <canvas id="main"></canvas>
     <div id="win">
@@ -104,11 +126,14 @@
 
   <div id="progressWrap"><div id="progressBar"></div></div>
 
-  <div id="controls">
+  <div class="row" id="stickerRow"><div class="label">① 撕貼紙（選一層貼上）</div></div>
+  <div class="row" id="colorRow"><div class="label">② 選沙的顏色</div></div>
+
+  <div class="row">
     <button class="primary" id="tiltBtn">啟用傾斜</button>
     <button id="resetBtn">清空重來</button>
   </div>
-  <div class="hint" id="hint">點畫面倒沙 · 傾斜 iPad 把沙導進圖案</div>
+  <div class="hint" id="hint">③ 按住畫面倒沙 · 傾斜 iPad 把沙鋪進貼紙</div>
 </div>
 
 <script>
@@ -119,127 +144,130 @@
 // 設定
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;          // 內部邏輯解析度
-const MAX_PARTICLES = 300;       // 同時移動的沙粒上限（少而胖）
-const POUR_PER_TAP = 36;         // 每次點擊倒下的沙量
-const STICK_CHANCE = 0.14;       // 黏附機率
+const MAX_PARTICLES = 340;       // 同時移動的沙粒上限（少而胖）
+const POUR_RATE = 7;             // 按住時每幀倒出的沙量（一坨持續流）
+const STICK_CHANCE = 0.16;       // 黏附機率
 const ACCEL = 0.35;              // 重力加速係數
 const DAMP = 0.97;               // 速度阻尼
 const MAX_SPEED = 3.2;           // 最大速度
-const WIN_RATIO = 0.85;          // 過關門檻
+const WIN_RATIO = 0.85;          // 過關門檻（已貼圖層的填滿比）
+
+const SAND_COLORS = ['#e7c08a', '#d23b3b', '#4caf50', '#e0c84a', '#5aa9e6', '#b07be0', '#f3ece0'];
 
 // ─────────────────────────────────────────────────────────────
-// 圖層定義：蘋果（body → leaf → stem → shine → outline）
-// 每層一個繪製函式，畫到 offscreen 後讀 alpha 建立遮罩
+// 圖層定義：蘋果。path() 只畫幾何，描邊/填色由呼叫端決定
 // ─────────────────────────────────────────────────────────────
 const LAYERS = [
-  { id: 'body',  color: '#d23b3b', draw(c){
-      c.fillStyle = '#fff';
-      // 左半與右半兩瓣，組成蘋果飽滿輪廓
+  { id:'body',  label:'果身', color:'#d23b3b', mode:'fill', path(c){
       c.beginPath(); c.ellipse(195, 270, 110, 130, 0, 0, 7); c.fill();
       c.beginPath(); c.ellipse(285, 270, 110, 130, 0, 0, 7); c.fill();
       c.beginPath(); c.ellipse(240, 250, 130, 120, 0, 0, 7); c.fill();
   }},
-  { id: 'leaf',  color: '#4caf50', draw(c){
-      c.fillStyle = '#fff'; c.save();
-      c.translate(300, 135); c.rotate(-0.5);
-      c.beginPath(); c.ellipse(0, 0, 46, 22, 0, 0, 7); c.fill();
-      c.restore();
+  { id:'leaf',  label:'葉', color:'#4caf50', mode:'fill', path(c){
+      c.save(); c.translate(300, 135); c.rotate(-0.5);
+      c.beginPath(); c.ellipse(0, 0, 46, 22, 0, 0, 7); c.fill(); c.restore();
   }},
-  { id: 'stem',  color: '#7a4a22', draw(c){
-      c.strokeStyle = '#fff'; c.lineWidth = 12; c.lineCap = 'round';
-      c.beginPath(); c.moveTo(242, 150); c.quadraticCurveTo(250, 110, 268, 100); c.stroke();
+  { id:'stem',  label:'梗', color:'#7a4a22', mode:'stroke', lw:12, path(c){
+      c.lineCap='round'; c.beginPath();
+      c.moveTo(242, 150); c.quadraticCurveTo(250, 110, 268, 100); c.stroke();
   }},
-  { id: 'shine', color: '#ffd9d9', draw(c){
-      c.fillStyle = '#fff'; c.save();
-      c.translate(180, 220); c.rotate(-0.4);
-      c.beginPath(); c.ellipse(0, 0, 26, 46, 0, 0, 7); c.fill();
-      c.restore();
+  { id:'shine', label:'亮面', color:'#ffd9d9', mode:'fill', path(c){
+      c.save(); c.translate(180, 220); c.rotate(-0.4);
+      c.beginPath(); c.ellipse(0, 0, 26, 46, 0, 0, 7); c.fill(); c.restore();
   }},
-  { id: 'outline', color: '#3a1010', draw(c){
-      c.strokeStyle = '#fff'; c.lineWidth = 7;
+  { id:'outline', label:'外框', color:'#3a1010', mode:'stroke', lw:7, path(c){
       c.beginPath(); c.ellipse(195, 270, 110, 130, 0, 0, 7); c.stroke();
       c.beginPath(); c.ellipse(285, 270, 110, 130, 0, 0, 7); c.stroke();
   }},
 ];
 
+// 用指定顏色（含透明度）把一層畫到 ctx
+function renderLayer(ctx, layer, color, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.fillStyle = color; ctx.strokeStyle = color;
+  if (layer.mode === 'stroke') ctx.lineWidth = layer.lw;
+  layer.path(ctx);
+  ctx.restore();
+}
+
 // ─────────────────────────────────────────────────────────────
-// LayerManager：建立每層遮罩、合併成 layerId map、計算進度
+// LayerManager：遮罩、貼紙狀態、進度
 // ─────────────────────────────────────────────────────────────
 class LayerManager {
   constructor() {
-    this.layerId = new Uint8Array(W * H);   // 0 = 無，1..n = 該層
-    this.filled  = new Uint8Array(W * H);   // 是否已被沙覆蓋
-    this.colors  = ['', ...LAYERS.map(l => l.color)];
-    this.total = 0;
-    this.covered = 0;
-    this.guide = document.createElement('canvas');
-    this.guide.width = W; this.guide.height = H;
+    this.layerId = new Uint8Array(W * H);    // 0 = 無，1..n
+    this.filled  = new Uint8Array(W * H);     // 已被沙覆蓋
+    this.placed  = new Set();                 // 已貼上的圖層 id (1..n)
+    this.pxCount = [0];                        // 每層遮罩像素數
     this._build();
   }
   _build() {
     const off = document.createElement('canvas');
     off.width = W; off.height = H;
     const oc = off.getContext('2d');
-    const gc = this.guide.getContext('2d');
-
     LAYERS.forEach((layer, i) => {
       const lid = i + 1;
       oc.clearRect(0, 0, W, H);
-      layer.draw(oc);
+      renderLayer(oc, layer, '#fff', 1);
       const data = oc.getImageData(0, 0, W, H).data;
+      let cnt = 0;
       for (let p = 0; p < W * H; p++) {
-        if (data[p * 4 + 3] > 30) this.layerId[p] = lid; // 後層覆蓋前層
+        if (data[p * 4 + 3] > 30) { this.layerId[p] = lid; }  // 後層覆蓋前層
       }
-      // 淡淡的引導圖
-      gc.globalAlpha = 0.16; gc.fillStyle = layer.color;
-      gc.save(); layer.draw(gc); gc.restore();
+      // 重新統計（覆蓋後）稍後做
+      this.pxCount[lid] = 0;
     });
-    gc.globalAlpha = 1;
-
-    for (let p = 0; p < W * H; p++) if (this.layerId[p]) this.total++;
+    for (let p = 0; p < W * H; p++) {
+      const lid = this.layerId[p];
+      if (lid) this.pxCount[lid]++;
+    }
   }
-  // 在 (x,y) 蓋一個半徑 r 的圓，回傳是否真的覆蓋到新的遮罩像素
+  place(lid) { this.placed.add(lid); }
+  total() { let t = 0; this.placed.forEach(lid => t += this.pxCount[lid]); return t; }
+  covered() {
+    let c = 0;
+    for (let p = 0; p < W * H; p++) if (this.filled[p] && this.placed.has(this.layerId[p])) c++;
+    return c;
+  }
+  ratio() { const t = this.total(); return t ? this.covered() / t : 0; }
+  allPlaced() { return this.placed.size === LAYERS.length; }
+  // 是否落在「已貼且未填」的遮罩
+  maskAt(x, y) {
+    if (x < 0 || y < 0 || x >= W || y >= H) return 0;
+    const p = (y | 0) * W + (x | 0);
+    const lid = this.layerId[p];
+    return (lid && this.placed.has(lid) && !this.filled[p]) ? lid : 0;
+  }
   stamp(x, y, r) {
-    let hit = false, lid = 0;
     const x0 = Math.max(0, x - r | 0), x1 = Math.min(W - 1, x + r | 0);
     const y0 = Math.max(0, y - r | 0), y1 = Math.min(H - 1, y + r | 0);
     const r2 = r * r;
-    for (let yy = y0; yy <= y1; yy++) {
+    for (let yy = y0; yy <= y1; yy++)
       for (let xx = x0; xx <= x1; xx++) {
         const dx = xx - x, dy = yy - y;
         if (dx * dx + dy * dy > r2) continue;
         const p = yy * W + xx;
-        if (this.layerId[p] && !this.filled[p]) {
-          this.filled[p] = 1; this.covered++; hit = true; lid = this.layerId[p];
-        } else if (this.layerId[p]) { lid = lid || this.layerId[p]; }
+        if (this.layerId[p] && this.placed.has(this.layerId[p]) && !this.filled[p]) this.filled[p] = 1;
       }
-    }
-    return { hit, color: this.colors[lid] || '#caa06a' };
   }
-  // 某點是否落在尚未填滿的遮罩上（用於黏附判定）
-  maskAt(x, y) {
-    if (x < 0 || y < 0 || x >= W || y >= H) return 0;
-    const p = (y | 0) * W + (x | 0);
-    return this.filled[p] ? 0 : this.layerId[p];
-  }
-  ratio() { return this.total ? this.covered / this.total : 0; }
-  reset() { this.filled.fill(0); this.covered = 0; }
+  reset() { this.filled.fill(0); this.placed.clear(); }
 }
 
 // ─────────────────────────────────────────────────────────────
-// ParticleSystem：移動中的沙粒（黏住的沙直接畫到 stuck canvas）
+// ParticleSystem
 // ─────────────────────────────────────────────────────────────
 class ParticleSystem {
   constructor() { this.list = []; }
-  pour(x, y, n) {
+  pour(x, y, n, color) {
     for (let i = 0; i < n && this.list.length < MAX_PARTICLES; i++) {
       this.list.push({
-        x: x + (Math.random() - 0.5) * 24,
-        y: y + (Math.random() - 0.5) * 24,
-        vx: (Math.random() - 0.5) * 1.5,
-        vy: (Math.random() - 0.5) * 1.5,
+        x: x + (Math.random() - 0.5) * 18,
+        y: y + (Math.random() - 0.5) * 18,
+        vx: (Math.random() - 0.5) * 1.2,
+        vy: Math.random() * 1.2,
         r: 3 + Math.random() * 2,            // 3~5px 胖沙粒
-        c: SAND_COLORS[(Math.random() * SAND_COLORS.length) | 0],
+        c: color,
       });
     }
   }
@@ -252,17 +280,13 @@ class ParticleSystem {
       const sp = Math.hypot(s.vx, s.vy);
       if (sp > MAX_SPEED) { s.vx = s.vx / sp * MAX_SPEED; s.vy = s.vy / sp * MAX_SPEED; }
       s.x += s.vx; s.y += s.vy;
-      // 邊界環繞
       if (s.x < 0) s.x += W; else if (s.x >= W) s.x -= W;
       if (s.y < 0) s.y += H; else if (s.y >= H) s.y -= H;
-      // 黏附判定
       if (layers.maskAt(s.x, s.y) && Math.random() < STICK_CHANCE) {
-        const res = layers.stamp(s.x, s.y, s.r);
-        stuckCtx.fillStyle = res.hit ? res.color : s.c;
+        layers.stamp(s.x, s.y, s.r);
+        stuckCtx.fillStyle = s.c;
         stuckCtx.beginPath(); stuckCtx.arc(s.x, s.y, s.r, 0, 7); stuckCtx.fill();
-      } else {
-        keep.push(s);
-      }
+      } else keep.push(s);
     }
     this.list = keep;
   }
@@ -274,39 +298,35 @@ class ParticleSystem {
   }
   clear() { this.list = []; }
 }
-const SAND_COLORS = ['#e7c08a', '#dcae72', '#e9cd9c', '#d49a5c'];
 
 // ─────────────────────────────────────────────────────────────
-// InputManager：傾斜（iPad）+ 預設向下重力 + 桌面方向鍵 + 點擊倒沙
+// InputManager：傾斜 + 預設向下 + 方向鍵
 // ─────────────────────────────────────────────────────────────
 class InputManager {
-  constructor(onPour) {
-    this.gx = 0; this.gy = 1;          // 預設往下
-    this.tilt = false;
-    this.onPour = onPour;
+  constructor() {
+    this.gx = 0; this.gy = 1; this.tilt = false;
     this._keys = { x: 0, y: 0 };
     window.addEventListener('keydown', e => this._key(e, 1));
     window.addEventListener('keyup', e => this._key(e, 0));
   }
   _key(e, v) {
-    if (e.key === 'ArrowLeft')  this._keys.x = -v;
+    if (e.key === 'ArrowLeft') this._keys.x = -v;
     else if (e.key === 'ArrowRight') this._keys.x = v;
-    else if (e.key === 'ArrowUp')   this._keys.y = -v;
+    else if (e.key === 'ArrowUp') this._keys.y = -v;
     else if (e.key === 'ArrowDown') this._keys.y = v;
     else return;
     e.preventDefault();
   }
   gravity() {
     if (this.tilt) return { x: this.gx, y: this.gy };
-    // 桌面：方向鍵覆寫，否則預設向下
     if (this._keys.x || this._keys.y) return { x: this._keys.x, y: this._keys.y || 0.2 };
     return { x: 0, y: 1 };
   }
   async enableTilt() {
     const handler = (e) => {
-      const g = e.gamma || 0, b = e.beta || 0;   // gamma左右, beta前後
+      const g = e.gamma || 0, b = e.beta || 0;
       this.gx = Math.max(-1, Math.min(1, g / 35));
-      this.gy = Math.max(-1, Math.min(1, (b - 35) / 35)); // 約略握持角度補償
+      this.gy = Math.max(-1, Math.min(1, (b - 35) / 35));
       this.tilt = true;
     };
     if (typeof DeviceOrientationEvent !== 'undefined' &&
@@ -324,14 +344,16 @@ class InputManager {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 組裝與主迴圈
+// 組裝
 // ─────────────────────────────────────────────────────────────
 const stage = document.getElementById('stage');
 const bg = document.getElementById('bg');
+const stickerCv = document.getElementById('sticker');
 const stuck = document.getElementById('stuck');
 const main = document.getElementById('main');
-[bg, stuck, main].forEach(c => { c.width = W; c.height = H; });
+[bg, stickerCv, stuck, main].forEach(c => { c.width = W; c.height = H; });
 const bgCtx = bg.getContext('2d');
+const stickerCtx = stickerCv.getContext('2d');
 const stuckCtx = stuck.getContext('2d');
 const mainCtx = main.getContext('2d');
 
@@ -339,14 +361,27 @@ const layers = new LayerManager();
 const particles = new ParticleSystem();
 const input = new InputManager();
 
-function paintBg() {
-  bgCtx.fillStyle = '#1a1208';
-  bgCtx.fillRect(0, 0, W, H);
-  bgCtx.drawImage(layers.guide, 0, 0);   // 淡淡的引導圖案
-}
-paintBg();
+bgCtx.fillStyle = '#1a1208';
+bgCtx.fillRect(0, 0, W, H);
 
-// 座標換算：螢幕 → 邏輯
+// 重畫已貼貼紙（淡色填 + 描邊輪廓，像撕下的貼紙）
+function redrawStickers() {
+  stickerCtx.clearRect(0, 0, W, H);
+  LAYERS.forEach((layer, i) => {
+    if (!layers.placed.has(i + 1)) return;
+    renderLayer(stickerCtx, layer, layer.color, 0.22);          // 淡淡的填色提示
+    // 外圈描邊
+    stickerCtx.save();
+    stickerCtx.globalAlpha = 0.7;
+    stickerCtx.strokeStyle = layer.color;
+    stickerCtx.lineWidth = layer.mode === 'stroke' ? layer.lw : 2.5;
+    stickerCtx.setLineDash(layer.mode === 'stroke' ? [] : [6, 5]);
+    layer.path(stickerCtx);
+    stickerCtx.restore();
+  });
+}
+
+// 座標換算
 function toLogical(clientX, clientY) {
   const rect = stage.getBoundingClientRect();
   return {
@@ -354,11 +389,50 @@ function toLogical(clientX, clientY) {
     y: (clientY - rect.top) / rect.height * H,
   };
 }
-function pourAt(clientX, clientY) {
-  const p = toLogical(clientX, clientY);
-  particles.pour(p.x, p.y, POUR_PER_TAP);
-}
-main.addEventListener('pointerdown', e => { pourAt(e.clientX, e.clientY); });
+
+// 倒沙：按住持續倒
+let pouring = false, pourPos = { x: 0, y: 0 };
+main.addEventListener('pointerdown', e => {
+  pouring = true; const p = toLogical(e.clientX, e.clientY); pourPos = p;
+  main.setPointerCapture(e.pointerId);
+});
+main.addEventListener('pointermove', e => {
+  if (pouring) pourPos = toLogical(e.clientX, e.clientY);
+});
+const stopPour = () => { pouring = false; };
+main.addEventListener('pointerup', stopPour);
+main.addEventListener('pointercancel', stopPour);
+
+// 沙色
+let selectedColor = SAND_COLORS[0];
+
+// 貼紙列 UI
+const stickerRow = document.getElementById('stickerRow');
+LAYERS.forEach((layer, i) => {
+  const b = document.createElement('div');
+  b.className = 'sticker';
+  b.innerHTML = `<span class="dot" style="background:${layer.color}"></span>${layer.label}`;
+  b.addEventListener('click', () => {
+    layers.place(i + 1);
+    b.classList.add('placed');
+    redrawStickers();
+  });
+  stickerRow.appendChild(b);
+});
+
+// 顏色盤 UI
+const colorRow = document.getElementById('colorRow');
+SAND_COLORS.forEach((col, i) => {
+  const s = document.createElement('div');
+  s.className = 'swatch' + (i === 0 ? ' sel' : '');
+  s.style.background = col;
+  s.addEventListener('click', () => {
+    selectedColor = col;
+    colorRow.querySelectorAll('.swatch').forEach(el => el.classList.remove('sel'));
+    s.classList.add('sel');
+  });
+  colorRow.appendChild(s);
+});
 
 const progressBar = document.getElementById('progressBar');
 const winEl = document.getElementById('win');
@@ -366,6 +440,8 @@ const hint = document.getElementById('hint');
 let won = false;
 
 function loop() {
+  if (pouring) particles.pour(pourPos.x, pourPos.y, POUR_RATE, selectedColor);
+
   const g = input.gravity();
   particles.step(g.x, g.y, layers, stuckCtx);
 
@@ -374,9 +450,8 @@ function loop() {
 
   const r = layers.ratio();
   progressBar.style.width = (r * 100).toFixed(0) + '%';
-  if (!won && r >= WIN_RATIO) {
-    won = true;
-    winEl.classList.add('show');
+  if (!won && layers.allPlaced() && r >= WIN_RATIO) {
+    won = true; winEl.classList.add('show');
   }
   requestAnimationFrame(loop);
 }
@@ -385,16 +460,18 @@ loop();
 // 控制鈕
 document.getElementById('tiltBtn').addEventListener('click', async (e) => {
   const ok = await input.enableTilt();
-  hint.textContent = ok ? '傾斜已啟用 · 點畫面倒沙' : '此裝置不支援傾斜，改用預設重力';
+  hint.textContent = ok ? '傾斜已啟用 · 按住畫面倒沙' : '此裝置不支援傾斜，改用預設向下重力';
   if (ok) e.target.textContent = '傾斜中';
 });
 function resetGame() {
   layers.reset();
   particles.clear();
   stuckCtx.clearRect(0, 0, W, H);
+  redrawStickers();
   won = false;
   winEl.classList.remove('show');
   progressBar.style.width = '0%';
+  document.querySelectorAll('.sticker').forEach(el => el.classList.remove('placed'));
 }
 document.getElementById('resetBtn').addEventListener('click', resetGame);
 document.getElementById('nextBtn').addEventListener('click', resetGame);
