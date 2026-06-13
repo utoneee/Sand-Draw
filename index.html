@@ -193,22 +193,41 @@ const OUTSIDE_COLOR = '#6b5638';   // 圖案外圍（不能填的部分）底色
 const FILM_GRAY = '#9c9587';       // 未撕膜的貼紙（灰）
 const PEELED_WHITE = '#fcf8f0';    // 撕掉膠膜後露出的白色黏貼面
 
-const SAND_COLORS = ['#262626', '#d23b3b', '#4caf50', '#7a4a22', '#e7c08a', '#f2cf3e', '#5aa9e6'];
+const SAND_COLORS = ['#262626', '#ffffff', '#d23b3b', '#4caf50', '#7a4a22', '#e7c08a', '#f2cf3e', '#5aa9e6'];
+const OUTLINE_COLOR = '#262626';   // 黑框（輪廓）填色用的黑沙顏色
+const OUTLINE_LW = 11;             // 黑框粗細
+
+// 共用輪廓路徑：本體填色與黑框共用同一條線，邊緣才會貼合
+function appleSilhouette(c) {
+  c.beginPath();
+  c.moveTo(240, 168);
+  c.bezierCurveTo(220, 132, 168, 122, 144, 152);
+  c.bezierCurveTo(100, 188, 100, 270, 130, 330);
+  c.bezierCurveTo(150, 372, 196, 390, 240, 354);
+  c.bezierCurveTo(284, 390, 330, 372, 350, 330);
+  c.bezierCurveTo(380, 270, 380, 188, 336, 152);
+  c.bezierCurveTo(312, 122, 260, 132, 240, 168);
+  c.closePath();
+}
+function bananaSilhouette(c) {
+  c.beginPath();
+  c.moveTo(130, 168);
+  c.bezierCurveTo(185, 126, 300, 138, 372, 252);
+  c.bezierCurveTo(384, 280, 362, 304, 334, 298);
+  c.bezierCurveTo(262, 252, 200, 250, 140, 214);
+  c.bezierCurveTo(116, 204, 116, 180, 130, 168);
+  c.closePath();
+}
 
 // ─────────────────────────────────────────────────────────────
 // 圖案資料：每個區塊只定義 path（不 fill/stroke），由呼叫端決定畫法
-// 區塊順序＝遮罩疊加順序（後者覆蓋前者，例如反光蓋在本體上）
+// 區塊順序＝遮罩疊加順序（後者覆蓋前者）；黑框放最後，蓋住邊緣
 // ─────────────────────────────────────────────────────────────
 const PATTERNS = {
   apple: {
     name: '蘋果',
     regions: [
-      { id:'body',  label:'果身', color:'#d23b3b', shape(c){
-          c.beginPath();
-          c.ellipse(195, 272, 108, 128, 0, 0, 7);
-          c.ellipse(285, 272, 108, 128, 0, 0, 7);
-          c.ellipse(240, 252, 128, 118, 0, 0, 7);
-      }},
+      { id:'body',  label:'果身', color:'#d23b3b', shape: appleSilhouette },
       { id:'leaf',  label:'葉', color:'#4caf50', shape(c){
           c.save(); c.translate(300, 138); c.rotate(-0.5);
           c.beginPath(); c.ellipse(0, 0, 44, 21, 0, 0, 7); c.restore();
@@ -220,33 +239,25 @@ const PATTERNS = {
           c.closePath();
       }},
       { id:'shine', label:'反光', color:'#ffe0e0', shape(c){
-          c.save(); c.translate(182, 222); c.rotate(-0.4);
-          c.beginPath(); c.ellipse(0, 0, 24, 44, 0, 0, 7); c.restore();
+          c.save(); c.translate(178, 232); c.rotate(-0.4);
+          c.beginPath(); c.ellipse(0, 0, 22, 40, 0, 0, 7); c.restore();
       }},
+      { id:'outline', label:'黑框', color: OUTLINE_COLOR, stroke:true, lw: OUTLINE_LW, shape: appleSilhouette },
     ],
   },
   banana: {
     name: '香蕉',
     regions: [
-      { id:'body',  label:'果身', color:'#f2cf3e', shape(c){
-          c.beginPath();
-          c.moveTo(130, 168);
-          c.bezierCurveTo(185, 126, 300, 138, 372, 252);
-          c.bezierCurveTo(384, 280, 362, 304, 334, 298);
-          c.bezierCurveTo(262, 252, 200, 250, 140, 214);
-          c.bezierCurveTo(116, 204, 116, 180, 130, 168);
-          c.closePath();
-      }},
+      { id:'body',  label:'果身', color:'#f2cf3e', shape: bananaSilhouette },
       { id:'tip',   label:'蒂頭', color:'#5a4020', shape(c){
           c.beginPath(); c.ellipse(132, 176, 16, 13, -0.4, 0, 7);
       }},
-      { id:'shine', label:'亮面', color:'#fff3b0', shape(c){
-          c.save(); c.lineWidth = 9; c.lineCap = 'round';
+      { id:'shine', label:'亮面', color:'#fff3b0', stroke:true, lw:9, shape(c){
           c.beginPath();
           c.moveTo(175, 178);
           c.bezierCurveTo(245, 162, 305, 182, 348, 252);
-          c.restore();
-      }, stroke:true },
+      }},
+      { id:'outline', label:'黑框', color: OUTLINE_COLOR, stroke:true, lw: OUTLINE_LW, shape: bananaSilhouette },
     ],
   },
 };
