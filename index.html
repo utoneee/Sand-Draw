@@ -70,17 +70,6 @@
   .row { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
   .label { font-size: 11px; color: var(--accent); opacity: .8; width: 100%; text-align: center; margin-bottom: -2px; }
 
-  /* 撕膠膜按鈕 */
-  .peel {
-    font-size: 13px; color: var(--text);
-    background: var(--panel); border: 1px solid rgba(232,185,107,.25);
-    padding: 7px 12px; border-radius: 11px; cursor: pointer;
-    display: flex; align-items: center; gap: 6px; transition: transform .08s, opacity .15s;
-  }
-  .peel:active { transform: scale(.94); }
-  .peel .dot { width: 12px; height: 12px; border-radius: 50%; }
-  .peel.peeled { opacity: .45; }
-  .peel.peeled::after { content: '✓'; color: var(--gold); font-size: 12px; }
 
   .swatch {
     width: 30px; height: 30px; border-radius: 50%;
@@ -163,13 +152,13 @@
 
   <div id="progressWrap" class="gameUi"><div id="progressBar"></div></div>
 
-  <div class="row gameUi" id="peelRow"><div class="label">① 撕膠膜（露出黏貼處）</div></div>
+  <div class="row gameUi"><div class="label">① 點圖案上的區塊 → 撕開那塊（露出黏貼面）</div></div>
   <div class="row gameUi" id="colorRow"><div class="label">② 點顏色 → 在中央倒一堆沙</div></div>
 
   <div class="row gameUi">
     <button id="dumpBtn">倒掉散沙</button>
   </div>
-  <div class="hint gameUi" id="hint">③ 傾斜 iPad 讓沙滑過膠水黏住 · 填好按「倒掉散沙」換下一色</div>
+  <div class="hint gameUi" id="hint">③ 傾斜 iPad 讓沙滑過黏貼面黏住 · 填好按「倒掉散沙」換下一塊</div>
 </div>
 
 <script>
@@ -504,33 +493,31 @@ function drawBoard() {
     const peeled = layers.peeled.has(i + 1);
     paintRegion(glueCtx, region, { color: peeled ? PEELED_WHITE : FILM_GRAY });
   });
-  // 2. 細刀模線：撕開前就能看出有幾塊可填
+  // 2. 細刀模線：只畫「未撕」的區塊，撕開後就消失
   glueCtx.save();
   glueCtx.strokeStyle = DIECUT_COLOR;
   glueCtx.globalAlpha = 0.55;
   glueCtx.lineWidth = 1.2;
   glueCtx.setLineDash([4, 4]);
   glueCtx.lineCap = 'round';
-  layers.regions.forEach(region => { region.shape(glueCtx); glueCtx.stroke(); });
+  layers.regions.forEach((region, i) => {
+    if (layers.peeled.has(i + 1)) return;
+    region.shape(glueCtx); glueCtx.stroke();
+  });
   glueCtx.restore();
 }
 
-// 撕膠膜列
-const peelRow = document.getElementById('peelRow');
-function buildPeelRow(pattern) {
-  peelRow.querySelectorAll('.peel').forEach(el => el.remove());
-  pattern.regions.forEach((region, i) => {
-    const b = document.createElement('div');
-    b.className = 'peel';
-    b.innerHTML = `<span class="dot" style="background:${region.color}"></span>${region.label}`;
-    b.addEventListener('click', () => {
-      layers.peel(i + 1);
-      b.classList.add('peeled');
-      drawBoard();
-    });
-    peelRow.appendChild(b);
-  });
+// 點圖面撕貼紙：點到哪一塊就撕開那塊
+function tapToPeel(clientX, clientY) {
+  if (!layers) return;
+  const rect = stage.getBoundingClientRect();
+  const x = (clientX - rect.left) / rect.width * W;
+  const y = (clientY - rect.top) / rect.height * H;
+  if (x < 0 || y < 0 || x >= W || y >= H) return;
+  const rid = layers.regionId[(y | 0) * W + (x | 0)];
+  if (rid && !layers.peeled.has(rid)) { layers.peel(rid); drawBoard(); }
 }
+main.addEventListener('pointerdown', e => tapToPeel(e.clientX, e.clientY));
 
 // 顏色盤
 const colorRow = document.getElementById('colorRow');
@@ -567,7 +554,6 @@ function startPattern(key) {
   particles.clear();
   stuckCtx.clearRect(0, 0, W, H);
   mainCtx.clearRect(0, 0, W, H);
-  buildPeelRow(PATTERNS[key]);
   drawBoard();
   won = false;
   winBanner.classList.remove('show');
