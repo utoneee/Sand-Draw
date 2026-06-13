@@ -61,27 +61,27 @@
     transition: width .15s ease-out;
   }
 
-  /* 貼紙列 */
   .row { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
   .label { font-size: 11px; color: var(--accent); opacity: .8; width: 100%; text-align: center; margin-bottom: -2px; }
-  .sticker {
+
+  /* 撕膠膜按鈕 */
+  .peel {
     font-size: 13px; color: var(--text);
     background: var(--panel); border: 1px solid rgba(232,185,107,.25);
     padding: 7px 12px; border-radius: 11px; cursor: pointer;
     display: flex; align-items: center; gap: 6px; transition: transform .08s, opacity .15s;
   }
-  .sticker:active { transform: scale(.94); }
-  .sticker .dot { width: 12px; height: 12px; border-radius: 50%; }
-  .sticker.placed { opacity: .45; }
-  .sticker.placed::after { content: '✓'; color: var(--gold); font-size: 12px; }
+  .peel:active { transform: scale(.94); }
+  .peel .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .peel.peeled { opacity: .45; }
+  .peel.peeled::after { content: '✓'; color: var(--gold); font-size: 12px; }
 
-  /* 顏色盤 */
   .swatch {
     width: 30px; height: 30px; border-radius: 50%;
-    cursor: pointer; border: 2px solid transparent; transition: transform .08s;
+    cursor: pointer; border: 2px solid rgba(0,0,0,.2); transition: transform .08s;
   }
   .swatch:active { transform: scale(.9); }
-  .swatch.sel { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(232,185,107,.4); }
+  .swatch.sel { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(232,185,107,.5); }
 
   button {
     font-family: inherit; font-size: 13px;
@@ -94,15 +94,25 @@
   button.primary { background: var(--accent); color: #fff; border-color: transparent; }
   .hint { font-size: 11px; color: var(--accent); opacity: .85; min-height: 15px; text-align: center; }
 
-  #win {
+  /* 遮罩：選圖案 / 完成 */
+  .overlay {
     position: absolute; inset: 0;
     display: none; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px; background: rgba(26,18,8,.82); backdrop-filter: blur(4px);
+    gap: 16px; background: rgba(26,18,8,.9); backdrop-filter: blur(4px);
     z-index: 5; text-align: center;
   }
-  #win.show { display: flex; }
-  #win .big { font-size: 30px; color: var(--gold); }
-  #win .small { font-size: 14px; color: var(--text); opacity: .85; }
+  .overlay.show { display: flex; }
+  .overlay .big { font-size: 24px; color: var(--gold); }
+  .overlay .small { font-size: 13px; color: var(--text); opacity: .85; }
+  .pickRow { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .pick {
+    width: 96px; height: 96px; border-radius: 16px;
+    background: #e9dcc2; border: 2px solid var(--gold);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: transform .1s;
+  }
+  .pick:active { transform: scale(.93); }
+  .pick canvas { width: 80px; height: 80px; }
 </style>
 </head>
 <body>
@@ -114,25 +124,34 @@
 
   <div id="stage">
     <canvas id="bg"></canvas>
-    <canvas id="sticker"></canvas>
+    <canvas id="lineart"></canvas>
+    <canvas id="glue"></canvas>
     <canvas id="stuck"></canvas>
     <canvas id="main"></canvas>
-    <div id="win">
+
+    <!-- 選圖案 -->
+    <div class="overlay show" id="pickOverlay">
+      <div class="big">選一個圖案</div>
+      <div class="pickRow" id="pickRow"></div>
+    </div>
+
+    <!-- 完成 -->
+    <div class="overlay" id="winOverlay">
       <div class="big">✨ 完成！</div>
       <div class="small">圖案顯現了</div>
-      <button class="primary" id="nextBtn">再玩一次</button>
+      <button class="primary" id="againBtn">換個圖案</button>
     </div>
   </div>
 
   <div id="progressWrap"><div id="progressBar"></div></div>
 
-  <div class="row" id="stickerRow"><div class="label">① 撕貼紙（選一層貼上）</div></div>
+  <div class="row" id="peelRow"><div class="label">① 撕膠膜（露出黏貼處）</div></div>
   <div class="row" id="colorRow"><div class="label">② 點顏色 → 在中央倒一堆沙</div></div>
 
   <div class="row">
     <button id="dumpBtn">倒掉散沙</button>
     <button id="tiltBtn">啟用傾斜</button>
-    <button id="resetBtn">重來</button>
+    <button id="pickBtn">換圖案</button>
   </div>
   <div class="hint" id="hint">③ 傾斜 iPad 讓沙滑過膠水黏住 · 填好按「倒掉散沙」換下一色</div>
 </div>
@@ -144,103 +163,128 @@
 // ─────────────────────────────────────────────────────────────
 // 設定
 // ─────────────────────────────────────────────────────────────
-const W = 480, H = 480;          // 內部邏輯解析度
-const MAX_PARTICLES = 520;       // 盤上散沙上限（少而胖）
-const SCOOP_AMOUNT = 210;        // 點一次顏色倒下的沙量
-const STICK_CHANCE = 0.16;       // 黏附機率（沙滑過膠水時黏住的機率）
-const ACCEL = 0.85;              // 重力加速係數（大一點＝有重量感）
-const DAMP = 0.84;               // 速度阻尼（低一點＝不飄、會停下堆積）
-const MAX_SPEED = 6.5;           // 最大速度
-const WIN_RATIO = 0.85;          // 過關門檻（已貼圖層的填滿比）
-const BG_COLOR = '#e9dcc2';      // 淺暖米色盤底
+const W = 480, H = 480;
+const MAX_PARTICLES = 520;
+const SCOOP_AMOUNT = 210;
+const STICK_CHANCE = 0.16;
+const ACCEL = 0.85;
+const DAMP = 0.84;
+const MAX_SPEED = 6.5;
+const WIN_RATIO = 0.85;
+const BG_COLOR = '#e9dcc2';
+const LINE_COLOR = '#3a2a1a';
 
-// 深色開頭，淺底上才看得清；對應蘋果各部位
-const SAND_COLORS = ['#262626', '#d23b3b', '#4caf50', '#7a4a22', '#e7c08a', '#e0c84a', '#5aa9e6'];
+const SAND_COLORS = ['#262626', '#d23b3b', '#4caf50', '#7a4a22', '#e7c08a', '#f2cf3e', '#5aa9e6'];
 
 // ─────────────────────────────────────────────────────────────
-// 圖層定義：蘋果。path() 只畫幾何，描邊/填色由呼叫端決定
+// 圖案資料：每個區塊只定義 path（不 fill/stroke），由呼叫端決定畫法
+// 區塊順序＝遮罩疊加順序（後者覆蓋前者，例如反光蓋在本體上）
 // ─────────────────────────────────────────────────────────────
-const LAYERS = [
-  { id:'body',  label:'果身', color:'#d23b3b', mode:'fill', path(c){
-      c.beginPath(); c.ellipse(195, 270, 110, 130, 0, 0, 7); c.fill();
-      c.beginPath(); c.ellipse(285, 270, 110, 130, 0, 0, 7); c.fill();
-      c.beginPath(); c.ellipse(240, 250, 130, 120, 0, 0, 7); c.fill();
-  }},
-  { id:'leaf',  label:'葉', color:'#4caf50', mode:'fill', path(c){
-      c.save(); c.translate(300, 135); c.rotate(-0.5);
-      c.beginPath(); c.ellipse(0, 0, 46, 22, 0, 0, 7); c.fill(); c.restore();
-  }},
-  { id:'stem',  label:'梗', color:'#7a4a22', mode:'stroke', lw:12, path(c){
-      c.lineCap='round'; c.beginPath();
-      c.moveTo(242, 150); c.quadraticCurveTo(250, 110, 268, 100); c.stroke();
-  }},
-  { id:'shine', label:'亮面', color:'#ffd9d9', mode:'fill', path(c){
-      c.save(); c.translate(180, 220); c.rotate(-0.4);
-      c.beginPath(); c.ellipse(0, 0, 26, 46, 0, 0, 7); c.fill(); c.restore();
-  }},
-  { id:'outline', label:'外框', color:'#3a1010', mode:'stroke', lw:7, path(c){
-      c.beginPath(); c.ellipse(195, 270, 110, 130, 0, 0, 7); c.stroke();
-      c.beginPath(); c.ellipse(285, 270, 110, 130, 0, 0, 7); c.stroke();
-  }},
-];
+const PATTERNS = {
+  apple: {
+    name: '蘋果',
+    regions: [
+      { id:'body',  label:'果身', color:'#d23b3b', shape(c){
+          c.beginPath();
+          c.ellipse(195, 272, 108, 128, 0, 0, 7);
+          c.ellipse(285, 272, 108, 128, 0, 0, 7);
+          c.ellipse(240, 252, 128, 118, 0, 0, 7);
+      }},
+      { id:'leaf',  label:'葉', color:'#4caf50', shape(c){
+          c.save(); c.translate(300, 138); c.rotate(-0.5);
+          c.beginPath(); c.ellipse(0, 0, 44, 21, 0, 0, 7); c.restore();
+      }},
+      { id:'stem',  label:'梗', color:'#7a4a22', shape(c){
+          c.beginPath();
+          c.moveTo(236, 152); c.quadraticCurveTo(246, 112, 262, 102);
+          c.lineTo(273, 110); c.quadraticCurveTo(256, 122, 250, 154);
+          c.closePath();
+      }},
+      { id:'shine', label:'反光', color:'#ffe0e0', shape(c){
+          c.save(); c.translate(182, 222); c.rotate(-0.4);
+          c.beginPath(); c.ellipse(0, 0, 24, 44, 0, 0, 7); c.restore();
+      }},
+    ],
+  },
+  banana: {
+    name: '香蕉',
+    regions: [
+      { id:'body',  label:'果身', color:'#f2cf3e', shape(c){
+          c.beginPath();
+          c.moveTo(130, 168);
+          c.bezierCurveTo(185, 126, 300, 138, 372, 252);
+          c.bezierCurveTo(384, 280, 362, 304, 334, 298);
+          c.bezierCurveTo(262, 252, 200, 250, 140, 214);
+          c.bezierCurveTo(116, 204, 116, 180, 130, 168);
+          c.closePath();
+      }},
+      { id:'tip',   label:'蒂頭', color:'#5a4020', shape(c){
+          c.beginPath(); c.ellipse(132, 176, 16, 13, -0.4, 0, 7);
+      }},
+      { id:'shine', label:'亮面', color:'#fff3b0', shape(c){
+          c.save(); c.lineWidth = 9; c.lineCap = 'round';
+          c.beginPath();
+          c.moveTo(175, 178);
+          c.bezierCurveTo(245, 162, 305, 182, 348, 252);
+          c.restore();
+      }, stroke:true },
+    ],
+  },
+};
 
-// 用指定顏色（含透明度）把一層畫到 ctx
-function renderLayer(ctx, layer, color, alpha) {
+// 把一個區塊畫到 ctx
+function paintRegion(ctx, region, opt) {
   ctx.save();
-  ctx.globalAlpha = alpha == null ? 1 : alpha;
-  ctx.fillStyle = color; ctx.strokeStyle = color;
-  if (layer.mode === 'stroke') ctx.lineWidth = layer.lw;
-  layer.path(ctx);
+  ctx.globalAlpha = opt.alpha == null ? 1 : opt.alpha;
+  ctx.fillStyle = opt.color; ctx.strokeStyle = opt.color;
+  const strokeMode = opt.stroke != null ? opt.stroke : region.stroke;
+  if (strokeMode) { ctx.lineWidth = opt.lw || region.lw || 9; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; }
+  region.shape(ctx);
+  if (strokeMode) ctx.stroke(); else ctx.fill();
   ctx.restore();
 }
 
 // ─────────────────────────────────────────────────────────────
-// LayerManager：遮罩、貼紙狀態、進度
+// LayerManager：依圖案建立遮罩、撕膜狀態、進度
 // ─────────────────────────────────────────────────────────────
 class LayerManager {
-  constructor() {
-    this.layerId = new Uint8Array(W * H);    // 0 = 無，1..n
-    this.filled  = new Uint8Array(W * H);     // 已被沙覆蓋
-    this.placed  = new Set();                 // 已貼上的圖層 id (1..n)
-    this.pxCount = [0];                        // 每層遮罩像素數
+  constructor(pattern) {
+    this.pattern = pattern;
+    this.regions = pattern.regions;
+    this.regionId = new Uint8Array(W * H);   // 0 = 無，1..n
+    this.filled   = new Uint8Array(W * H);
+    this.peeled   = new Set();                // 已撕膜的區塊 id (1..n)
+    this.pxCount  = [0];
     this._build();
   }
   _build() {
     const off = document.createElement('canvas');
     off.width = W; off.height = H;
     const oc = off.getContext('2d');
-    LAYERS.forEach((layer, i) => {
-      const lid = i + 1;
+    this.regions.forEach((region, i) => {
+      const rid = i + 1;
       oc.clearRect(0, 0, W, H);
-      renderLayer(oc, layer, '#fff', 1);
+      paintRegion(oc, region, { color:'#fff' });
       const data = oc.getImageData(0, 0, W, H).data;
-      let cnt = 0;
-      for (let p = 0; p < W * H; p++) {
-        if (data[p * 4 + 3] > 30) { this.layerId[p] = lid; }  // 後層覆蓋前層
-      }
-      // 重新統計（覆蓋後）稍後做
-      this.pxCount[lid] = 0;
+      for (let p = 0; p < W * H; p++) if (data[p * 4 + 3] > 40) this.regionId[p] = rid;
+      this.pxCount[rid] = 0;
     });
-    for (let p = 0; p < W * H; p++) {
-      const lid = this.layerId[p];
-      if (lid) this.pxCount[lid]++;
-    }
+    for (let p = 0; p < W * H; p++) { const r = this.regionId[p]; if (r) this.pxCount[r]++; }
   }
-  place(lid) { this.placed.add(lid); }
-  total() { let t = 0; this.placed.forEach(lid => t += this.pxCount[lid]); return t; }
+  peel(rid) { this.peeled.add(rid); }
+  total() { let t = 0; this.peeled.forEach(r => t += this.pxCount[r]); return t; }
   covered() {
     let c = 0;
-    for (let p = 0; p < W * H; p++) if (this.filled[p] && this.placed.has(this.layerId[p])) c++;
+    for (let p = 0; p < W * H; p++) if (this.filled[p] && this.peeled.has(this.regionId[p])) c++;
     return c;
   }
   ratio() { const t = this.total(); return t ? this.covered() / t : 0; }
-  allPlaced() { return this.placed.size === LAYERS.length; }
-  // 是否落在「已貼且未填」的遮罩
+  allPeeled() { return this.peeled.size === this.regions.length; }
   maskAt(x, y) {
     if (x < 0 || y < 0 || x >= W || y >= H) return 0;
     const p = (y | 0) * W + (x | 0);
-    const lid = this.layerId[p];
-    return (lid && this.placed.has(lid) && !this.filled[p]) ? lid : 0;
+    const r = this.regionId[p];
+    return (r && this.peeled.has(r) && !this.filled[p]) ? r : 0;
   }
   stamp(x, y, r) {
     const x0 = Math.max(0, x - r | 0), x1 = Math.min(W - 1, x + r | 0);
@@ -251,10 +295,9 @@ class LayerManager {
         const dx = xx - x, dy = yy - y;
         if (dx * dx + dy * dy > r2) continue;
         const p = yy * W + xx;
-        if (this.layerId[p] && this.placed.has(this.layerId[p]) && !this.filled[p]) this.filled[p] = 1;
+        if (this.regionId[p] && this.peeled.has(this.regionId[p]) && !this.filled[p]) this.filled[p] = 1;
       }
   }
-  reset() { this.filled.fill(0); this.placed.clear(); }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -262,16 +305,15 @@ class LayerManager {
 // ─────────────────────────────────────────────────────────────
 class ParticleSystem {
   constructor() { this.list = []; }
-  // 在畫面正中央倒一堆散沙
   scoop(color, n) {
     for (let i = 0; i < n && this.list.length < MAX_PARTICLES; i++) {
-      const a = Math.random() * 7, rr = Math.random() * 46;
+      const a = Math.random() * 7, rr = Math.random() * 48;
       this.list.push({
         x: W / 2 + Math.cos(a) * rr,
         y: H / 2 + Math.sin(a) * rr,
         vx: (Math.random() - 0.5) * 0.4,
         vy: (Math.random() - 0.5) * 0.4,
-        r: 3 + Math.random() * 2,            // 3~5px 胖沙粒
+        r: 3 + Math.random() * 2,
         c: color,
       });
     }
@@ -285,12 +327,11 @@ class ParticleSystem {
       const sp = Math.hypot(s.vx, s.vy);
       if (sp > MAX_SPEED) { s.vx = s.vx / sp * MAX_SPEED; s.vy = s.vy / sp * MAX_SPEED; }
       s.x += s.vx; s.y += s.vy;
-      // 撞到邊緣就停住、堆積（不環繞），像真的沙堆在牆角
       if (s.x < s.r) { s.x = s.r; s.vx = 0; }
       else if (s.x > W - s.r) { s.x = W - s.r; s.vx = 0; }
       if (s.y < s.r) { s.y = s.r; s.vy = 0; }
       else if (s.y > H - s.r) { s.y = H - s.r; s.vy = 0; }
-      if (layers.maskAt(s.x, s.y) && Math.random() < STICK_CHANCE) {
+      if (layers && layers.maskAt(s.x, s.y) && Math.random() < STICK_CHANCE) {
         layers.stamp(s.x, s.y, s.r);
         stuckCtx.fillStyle = s.c;
         stuckCtx.beginPath(); stuckCtx.arc(s.x, s.y, s.r, 0, 7); stuckCtx.fill();
@@ -308,7 +349,7 @@ class ParticleSystem {
 }
 
 // ─────────────────────────────────────────────────────────────
-// InputManager：傾斜 + 預設向下 + 方向鍵
+// InputManager
 // ─────────────────────────────────────────────────────────────
 class InputManager {
   constructor() {
@@ -356,57 +397,61 @@ class InputManager {
 // ─────────────────────────────────────────────────────────────
 const stage = document.getElementById('stage');
 const bg = document.getElementById('bg');
-const stickerCv = document.getElementById('sticker');
+const lineartCv = document.getElementById('lineart');
+const glueCv = document.getElementById('glue');
 const stuck = document.getElementById('stuck');
 const main = document.getElementById('main');
-[bg, stickerCv, stuck, main].forEach(c => { c.width = W; c.height = H; });
+[bg, lineartCv, glueCv, stuck, main].forEach(c => { c.width = W; c.height = H; });
 const bgCtx = bg.getContext('2d');
-const stickerCtx = stickerCv.getContext('2d');
+const lineartCtx = lineartCv.getContext('2d');
+const glueCtx = glueCv.getContext('2d');
 const stuckCtx = stuck.getContext('2d');
 const mainCtx = main.getContext('2d');
-
-const layers = new LayerManager();
-const particles = new ParticleSystem();
-const input = new InputManager();
 
 bgCtx.fillStyle = BG_COLOR;
 bgCtx.fillRect(0, 0, W, H);
 
-// 重畫已貼貼紙（淡色填 + 描邊輪廓，像撕下的貼紙）
-function redrawStickers() {
-  stickerCtx.clearRect(0, 0, W, H);
-  LAYERS.forEach((layer, i) => {
-    if (!layers.placed.has(i + 1)) return;
-    renderLayer(stickerCtx, layer, layer.color, 0.3);           // 膠水區的填色提示
-    // 外圈描邊
-    stickerCtx.save();
-    stickerCtx.globalAlpha = 0.85;
-    stickerCtx.strokeStyle = layer.color;
-    stickerCtx.lineWidth = layer.mode === 'stroke' ? layer.lw : 2.5;
-    stickerCtx.setLineDash(layer.mode === 'stroke' ? [] : [6, 5]);
-    layer.path(stickerCtx);
-    stickerCtx.restore();
+const particles = new ParticleSystem();
+const input = new InputManager();
+let layers = null;
+let selectedColor = SAND_COLORS[0];
+let won = false;
+
+// 畫線稿（整個圖案的封閉線條，一開始就全顯示）
+function drawLineart(pattern) {
+  lineartCtx.clearRect(0, 0, W, H);
+  pattern.regions.forEach(region => {
+    paintRegion(lineartCtx, region, { color: LINE_COLOR, stroke: true, lw: region.stroke ? (region.lw || 9) : 3 });
+  });
+}
+// 重畫已撕膜區塊的膠水（淡色填，提示可填處）
+function redrawGlue() {
+  glueCtx.clearRect(0, 0, W, H);
+  if (!layers) return;
+  layers.regions.forEach((region, i) => {
+    if (!layers.peeled.has(i + 1)) return;
+    paintRegion(glueCtx, region, { color: region.color, alpha: 0.32 });
   });
 }
 
-// 沙色
-let selectedColor = SAND_COLORS[0];
-
-// 貼紙列 UI
-const stickerRow = document.getElementById('stickerRow');
-LAYERS.forEach((layer, i) => {
-  const b = document.createElement('div');
-  b.className = 'sticker';
-  b.innerHTML = `<span class="dot" style="background:${layer.color}"></span>${layer.label}`;
-  b.addEventListener('click', () => {
-    layers.place(i + 1);
-    b.classList.add('placed');
-    redrawStickers();
+// 撕膠膜列
+const peelRow = document.getElementById('peelRow');
+function buildPeelRow(pattern) {
+  peelRow.querySelectorAll('.peel').forEach(el => el.remove());
+  pattern.regions.forEach((region, i) => {
+    const b = document.createElement('div');
+    b.className = 'peel';
+    b.innerHTML = `<span class="dot" style="background:${region.color}"></span>${region.label}`;
+    b.addEventListener('click', () => {
+      layers.peel(i + 1);
+      b.classList.add('peeled');
+      redrawGlue();
+    });
+    peelRow.appendChild(b);
   });
-  stickerRow.appendChild(b);
-});
+}
 
-// 顏色盤 UI
+// 顏色盤
 const colorRow = document.getElementById('colorRow');
 SAND_COLORS.forEach((col, i) => {
   const s = document.createElement('div');
@@ -416,53 +461,79 @@ SAND_COLORS.forEach((col, i) => {
     selectedColor = col;
     colorRow.querySelectorAll('.swatch').forEach(el => el.classList.remove('sel'));
     s.classList.add('sel');
-    particles.scoop(col, SCOOP_AMOUNT);   // 點顏色＝選色＋在中央倒一堆沙
+    particles.scoop(col, SCOOP_AMOUNT);
   });
   colorRow.appendChild(s);
 });
 
-const progressBar = document.getElementById('progressBar');
-const winEl = document.getElementById('win');
-const hint = document.getElementById('hint');
-let won = false;
+// 選圖案畫面：縮圖
+const pickRow = document.getElementById('pickRow');
+const pickOverlay = document.getElementById('pickOverlay');
+const winOverlay = document.getElementById('winOverlay');
+Object.keys(PATTERNS).forEach(key => {
+  const pat = PATTERNS[key];
+  const wrap = document.createElement('div');
+  wrap.className = 'pick';
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d');
+  pat.regions.forEach(r => paintRegion(cx, r, { color: r.color, alpha: 0.9 }));
+  pat.regions.forEach(r => paintRegion(cx, r, { color: LINE_COLOR, stroke: true, lw: r.stroke ? (r.lw || 9) : 3 }));
+  wrap.appendChild(cv);
+  wrap.title = pat.name;
+  wrap.addEventListener('click', () => startPattern(key));
+  pickRow.appendChild(wrap);
+});
 
+// 開始一個圖案
+function startPattern(key) {
+  layers = new LayerManager(PATTERNS[key]);
+  particles.clear();
+  stuckCtx.clearRect(0, 0, W, H);
+  mainCtx.clearRect(0, 0, W, H);
+  glueCtx.clearRect(0, 0, W, H);
+  drawLineart(PATTERNS[key]);
+  buildPeelRow(PATTERNS[key]);
+  won = false;
+  winOverlay.classList.remove('show');
+  pickOverlay.classList.remove('show');
+  document.getElementById('progressBar').style.width = '0%';
+}
+
+// 回到選圖案
+function showPicker() {
+  pickOverlay.classList.add('show');
+  winOverlay.classList.remove('show');
+}
+
+// 主迴圈
+const progressBar = document.getElementById('progressBar');
 function loop() {
   const g = input.gravity();
   particles.step(g.x, g.y, layers, stuckCtx);
-
   mainCtx.clearRect(0, 0, W, H);
   particles.draw(mainCtx);
-
-  const r = layers.ratio();
-  progressBar.style.width = (r * 100).toFixed(0) + '%';
-  if (!won && layers.allPlaced() && r >= WIN_RATIO) {
-    won = true; winEl.classList.add('show');
+  if (layers) {
+    const r = layers.ratio();
+    progressBar.style.width = (r * 100).toFixed(0) + '%';
+    if (!won && layers.allPeeled() && r >= WIN_RATIO) {
+      won = true; winOverlay.classList.add('show');
+    }
   }
   requestAnimationFrame(loop);
 }
 loop();
 
 // 控制鈕
-document.getElementById('dumpBtn').addEventListener('click', () => {
-  particles.clear();   // 清掉盤上的散沙（已黏住的不受影響）
-});
+document.getElementById('dumpBtn').addEventListener('click', () => particles.clear());
+document.getElementById('pickBtn').addEventListener('click', showPicker);
+document.getElementById('againBtn').addEventListener('click', showPicker);
 document.getElementById('tiltBtn').addEventListener('click', async (e) => {
   const ok = await input.enableTilt();
-  hint.textContent = ok ? '傾斜已啟用 · 按住畫面倒沙' : '此裝置不支援傾斜，改用預設向下重力';
+  document.getElementById('hint').textContent =
+    ok ? '傾斜已啟用 · 點顏色加沙 → 傾斜滑過膠水' : '此裝置不支援傾斜，改用預設向下重力';
   if (ok) e.target.textContent = '傾斜中';
 });
-function resetGame() {
-  layers.reset();
-  particles.clear();
-  stuckCtx.clearRect(0, 0, W, H);
-  redrawStickers();
-  won = false;
-  winEl.classList.remove('show');
-  progressBar.style.width = '0%';
-  document.querySelectorAll('.sticker').forEach(el => el.classList.remove('placed'));
-}
-document.getElementById('resetBtn').addEventListener('click', resetGame);
-document.getElementById('nextBtn').addEventListener('click', resetGame);
 
 })();
 </script>
