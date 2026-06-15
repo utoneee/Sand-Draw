@@ -387,6 +387,7 @@
         <div id="colorRow"></div>
         <div class="tools">
           <button id="dumpBtn" class="iconBtn" title="倒掉散沙">↺</button>
+          <button id="muteBtn" class="iconBtn" title="音效開關">🔊</button>
         </div>
       </div>
     </div>
@@ -465,6 +466,7 @@ const BASE_GRAVITY = 0.22;       // 永遠存在的微量向下重力（給「�
 const REST_SPEED = 0.14;         // 低於此速度就視為靜止（消除漂浮抖動）
 const SLEEP_EPS = 0.4;           // 一幀淨位移小於此 → 視為沒動
 const SLEEP_FRAMES = 6;          // 連續這麼多幀幾乎沒動 → 沙粒睡著（靜止不再被重力推、不抖）
+const SEPARATE_ITERS = 2;        // 分離鬆弛迭代次數（越多＝堆得越緊實，但較耗效能）
 const WIN_RATIO = 0.85;
 // 主題：深灰沉穩 / 淨白簡約（只影響盤面、貼紙、托盤質感，不動沙作品）
 const THEMES = {
@@ -912,39 +914,42 @@ class ParticleSystem {
     }
     this.list = keep;
   }
-  // 空間網格做鄰近沙粒分離，避免重疊、形成沙堆
+  // 空間網格做鄰近沙粒分離，避免重疊、形成沙堆。多迭代＝堆得更緊實
   _separate() {
     const cs = 11;
-    const buckets = new Map();
     const key = (cx, cy) => cx * 100000 + cy;
     const L = this.list;
-    for (let i = 0; i < L.length; i++) {
-      const cx = (L[i].x / cs) | 0, cy = (L[i].y / cs) | 0;
-      const k = key(cx, cy);
-      let arr = buckets.get(k); if (!arr) { arr = []; buckets.set(k, arr); }
-      arr.push(i);
-    }
-    for (let i = 0; i < L.length; i++) {
-      const a = L[i];
-      const cx = (a.x / cs) | 0, cy = (a.y / cs) | 0;
-      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
-        const arr = buckets.get(key(cx + ox, cy + oy));
-        if (!arr) continue;
-        for (const j of arr) {
-          if (j <= i) continue;
-          const b = L[j];
-          let dx = b.x - a.x, dy = b.y - a.y;
-          const min = a.r + b.r;
-          let d2 = dx * dx + dy * dy;
-          if (d2 >= min * min || d2 === 0) {
-            if (d2 === 0) { dx = (Math.random() - 0.5) * 0.5; dy = (Math.random() - 0.5) * 0.5; d2 = dx * dx + dy * dy; }
-            else continue;
+    for (let iter = 0; iter < SEPARATE_ITERS; iter++) {
+      const buckets = new Map();
+      for (let i = 0; i < L.length; i++) {
+        const cx = (L[i].x / cs) | 0, cy = (L[i].y / cs) | 0;
+        const k = key(cx, cy);
+        let arr = buckets.get(k); if (!arr) { arr = []; buckets.set(k, arr); }
+        arr.push(i);
+      }
+      for (let i = 0; i < L.length; i++) {
+        const a = L[i];
+        const cx = (a.x / cs) | 0, cy = (a.y / cs) | 0;
+        for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+          const arr = buckets.get(key(cx + ox, cy + oy));
+          if (!arr) continue;
+          for (const j of arr) {
+            if (j <= i) continue;
+            const b = L[j];
+            let dx = b.x - a.x, dy = b.y - a.y;
+            const min = a.r + b.r;
+            let d2 = dx * dx + dy * dy;
+            if (d2 >= min * min || d2 === 0) {
+              if (d2 === 0) { dx = (Math.random() - 0.5) * 0.5; dy = (Math.random() - 0.5) * 0.5; d2 = dx * dx + dy * dy; }
+              else continue;
+            }
+            const d = Math.sqrt(d2) || 0.01;
+            const push = (min - d) * 0.5;
+            const nx = dx / d, ny = dy / d;
+            a.x -= nx * push; a.y -= ny * push;
+            b.x += nx * push; b.y += ny * push;
+            if (a.sleep || b.sleep) { a.sleep = false; b.sleep = false; a.still = b.still = 0; }  // 被擠到就醒
           }
-          const d = Math.sqrt(d2) || 0.01;
-          const push = (min - d) * 0.5;
-          const nx = dx / d, ny = dy / d;
-          a.x -= nx * push; a.y -= ny * push;
-          b.x += nx * push; b.y += ny * push;
         }
       }
     }
@@ -1083,6 +1088,48 @@ let layers = null;
 let won = false;
 let currentKey = null;
 
+// ── 音效（Web Audio 即時合成，無外部檔案）──
+const Sound = {
+  ctx: null, muted: false, _noise: null,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    this.ctx = new AC();
+    const len = Math.floor(this.ctx.sampleRate * 1.0);
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;   // 白噪，給倒沙聲用
+    this._noise = buf;
+  },
+  pour() {                                    // 倒沙：帶通白噪 + 衰減包絡＝沙沙聲
+    if (this.muted || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.7;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.18, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.55);
+    src.connect(bp); bp.connect(g); g.connect(this.ctx.destination);
+    src.start(t); src.stop(t + 0.62);
+  },
+  ding() {                                    // 完成：柔和三音
+    if (this.muted || !this.ctx) return;
+    [523.25, 659.25, 783.99].forEach((f, i) => {
+      const t = this.ctx.currentTime + i * 0.16;
+      const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0008, t + 0.9);
+      o.connect(g); g.connect(this.ctx.destination);
+      o.start(t); o.stop(t + 1.0);
+    });
+  },
+  toggle() { this.muted = !this.muted; if (!this.muted) this.init(); return this.muted; },
+};
+
 // ── 成就：本機儲存「已完成」作品＋快照（重開還在，不需登入）──
 const SAVE_KEY = 'sandplay.completed.v1';
 let COMPLETED = {};
@@ -1204,6 +1251,7 @@ SAND_COLORS.forEach((col, i) => {
   s.addEventListener('click', () => {
     colorRow.querySelectorAll('.swatch').forEach(el => el.classList.remove('sel'));
     s.classList.add('sel');
+    Sound.init(); Sound.pour();
     particles.scoop(col, SCOOP_AMOUNT);
   });
   colorRow.appendChild(s);
@@ -1415,6 +1463,7 @@ document.getElementById('panelTheme').querySelectorAll('.segBtn').forEach(b => {
 
 // 開始一個圖案
 function startPattern(key) {
+  Sound.init();                      // 進遊戲時用點擊手勢解鎖音訊
   currentKey = key;
   layers = new LayerManager(PATTERNS[key]);
   particles.clear();
@@ -1466,6 +1515,7 @@ function loop() {
     if (!won && layers.allPeeled() && r >= WIN_RATIO) {
       won = true;
       if (currentKey) { COMPLETED[currentKey] = { thumb: captureSnapshot(), at: Date.now() }; saveCompleted(); }
+      Sound.ding();
       playReveal();
     }
   }
@@ -1475,6 +1525,10 @@ loop();
 
 // 控制鈕
 document.getElementById('dumpBtn').addEventListener('click', () => particles.clear());
+(() => {
+  const muteBtn = document.getElementById('muteBtn');
+  muteBtn.addEventListener('click', () => { const m = Sound.toggle(); muteBtn.textContent = m ? '🔇' : '🔊'; });
+})();
 document.getElementById('changeBtn').addEventListener('click', () => {
   // 已完成（已存起來）或沒進度 → 直接換；有未存的進度才確認
   if (layers && layers.covered() > 0 && !won && !confirm('要換圖案嗎？目前的作品會清掉。')) return;
