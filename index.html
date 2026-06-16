@@ -353,8 +353,8 @@
         </div>
       </div>
       <div class="tpGrp">
-        <div class="ctlLabel">收藏紀錄</div>
-        <button class="tsub" id="clearRecBtn">清除已完成紀錄</button>
+        <div class="ctlLabel">關卡</div>
+        <button class="tsub" id="resetBtn">重製這一幅</button>
       </div>
     </div>
 
@@ -390,6 +390,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
+    <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
   <div class="galScroll">
@@ -1480,12 +1481,19 @@ document.getElementById('panelTheme').querySelectorAll('.segBtn').forEach(b => {
   b.addEventListener('click', () => applyTheme(b.dataset.theme));
 });
 
-// 清除已完成紀錄（收藏）
-document.getElementById('clearRecBtn').addEventListener('click', () => {
+// 清除已完成紀錄（收藏）— 在畫廊頁操作
+document.getElementById('clearRecBtnG').addEventListener('click', () => {
   if (!Object.keys(COMPLETED).length) { alert('目前沒有已完成的紀錄'); return; }
   if (!confirm('確定清除所有已完成紀錄嗎？此動作無法復原。')) return;
   COMPLETED = {}; saveCompleted();
   if (typeof buildGrid === 'function') buildGrid();   // 畫廊的滿彩卡會變回剪影
+});
+
+// 重製這一幅（遊玩中）— 清掉目前的沙、重新開始填同一幅
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!currentKey) return;
+  if (layers && layers.covered() > 0 && !won && !confirm('重新開始這一幅嗎？目前填的沙會清掉。')) return;
+  startPattern(currentKey);
   openPanel(false);
 });
 
