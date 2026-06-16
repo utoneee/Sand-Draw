@@ -202,6 +202,7 @@
   .screen-ov.show { display: flex; }
   .ovTop { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top,10px) + 12px) 22px 6px; }
   .ovTop .ovTitle { font-size: 16px; font-weight: 600; letter-spacing: 3px; margin-right: auto; }
+  .ovUpd { font-size: 10.5px; color: var(--muted); letter-spacing: .5px; white-space: nowrap; opacity: .8; }
 
   .galScroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 6px 22px calc(env(safe-area-inset-bottom,16px) + 28px); }
   .galHead { padding: 14px 2px 18px; }
@@ -390,6 +391,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/17 00:06</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -439,8 +441,8 @@
 // 設定
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
-const MAX_PARTICLES = 700;       // 沙變細後提高上限，讓「一坨沙」夠份量
-const SCOOP_AMOUNT = 300;        // 單次倒沙量（配合細沙加量）
+const MAX_PARTICLES = 950;       // 上限提高，容納更大坨的沙
+const SCOOP_AMOUNT = 480;        // 單次倒沙量（一次倒多一點）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
 const STICK_CHANCE = 0.3;        // 黏贴機率（越高＝沙黏得越多、填得越滿）
 const ACCEL = 1.1;               // 重力加速係數（提高＝沙落得更乾脆，不慢飄）
@@ -1102,18 +1104,20 @@ const Sound = {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this._noise = buf;
   },
-  pour() {                                    // 倒沙：扎實悶響（挖土／踩雪）——音量低、頻段低、尾巴短、無迴響
+  pour() {                                    // 倒沙：扎實悶響（挖土／踩雪）——快起、快收、尾端稀疏輕落
     if (this.muted || !this.ctx) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
     const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 160;
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300; lp.Q.value = 0.3;  // 更悶實，去掉鐵板般的亮迴響
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300; lp.Q.value = 0.3;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.12, t + 0.03);    // 音量降低
-    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.26);   // 尾巴短＝不拖迴響
+    g.gain.linearRampToValueAtTime(0.11, t + 0.025);             // 紮實的起音
+    g.gain.exponentialRampToValueAtTime(0.02, t + 0.12);          // 主體快速收掉
+    g.gain.exponentialRampToValueAtTime(0.0004, t + 0.34);        // 再拖一段稀疏輕尾（最後幾粒落下）
     src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
-    src.start(t); src.stop(t + 0.3);
+    src.start(t); src.stop(t + 0.38);
   },
   _ensureSlide() {                            // 持續滑沙：輕柔毛毛雨——提亮去悶、降低音量
     if (this._slideGain || !this.ctx) return;
@@ -1127,8 +1131,9 @@ const Sound = {
   },
   setSlide(level) {                           // 每幀依「移動中沙量」設定滑沙音量（0=靜音）；越少沙越輕
     if (this.muted || !this.ctx) { if (this._slideGain) this._slideGain.gain.setTargetAtTime(0, this.ctx ? this.ctx.currentTime : 0, 0.1); return; }
+    if (this.ctx.state === 'suspended') this.ctx.resume();   // 完成後若被掛起，自我喚醒，滑沙不會消失
     this._ensureSlide();
-    const target = Math.min(1, Math.max(0, level)) * 0.04;   // 大幅降量＝毛毛雨而非大雨
+    const target = Math.min(1, Math.max(0, level)) * 0.026;  // 再降量＝更乾淨輕柔（毛毛雨）
     this._slideGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.12);
   },
   slideOff() {                                // 立即收掉（清沙／換圖／完成時）
