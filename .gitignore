@@ -1,10 +1,8 @@
 # 備份與過程檔只存本機，不推送
-沙畫遊戲-v*.html
-*.docx
 _archive/
 _notes/
 _drafts/
-沙畫APP美化_0615/
+svg/
 ~$*
 .DS_Store
 Thumbs.db
