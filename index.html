@@ -352,6 +352,10 @@
           <button class="segBtn" data-theme="light">淨白</button>
         </div>
       </div>
+      <div class="tpGrp">
+        <div class="ctlLabel">收藏紀錄</div>
+        <button class="tsub" id="clearRecBtn">清除已完成紀錄</button>
+      </div>
     </div>
 
     <div class="playRow">
@@ -693,17 +697,21 @@ function _traceGrain(ctx, cx, cy, r, rot, sd, shape){
 // 在 sprite 上畫一顆有立體感的細沙（接觸陰影＋球體漸層＋亮度抖動＋高光＋偶發反光）
 function _drawOneGrain(ctx, x, y, r, g, sd, shape){
   const rot = sd*6.283;
-  ctx.globalAlpha = 0.27; ctx.fillStyle = rgbStr(g.darkest);
+  ctx.globalAlpha = 0.17; ctx.fillStyle = rgbStr(g.darkest);   // 接觸陰影減淡，避免整體偏灰
   _traceGrain(ctx, x+r*0.15, y+r*0.2, r*0.96, rot, sd, shape); ctx.fill(); ctx.globalAlpha = 1;
   const jb = mix(g.base, sd<0.5 ? 0 : 255, _gh(sd, r)*0.12);
   const grd = ctx.createRadialGradient(x-r*0.3, y-r*0.34, r*0.08, x, y, r);
-  grd.addColorStop(0, rgbStr(mix(jb,255,0.22))); grd.addColorStop(0.55, rgbStr(jb)); grd.addColorStop(1, rgbStr(mix(jb,0,0.16)));
+  grd.addColorStop(0, rgbStr(mix(jb,255,0.24))); grd.addColorStop(0.55, rgbStr(jb)); grd.addColorStop(1, rgbStr(mix(jb,0,0.09)));
   ctx.fillStyle = grd; _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.fill();
-  // 反差細邊：依顆粒自身明暗取反向描邊 → 白沙在淺底描深邊、黑沙在深底描淺邊，任何介面都讀得出
+  // 反差細邊：只有近白沙(lum>195)才描深邊解決淺底看不見；其餘大地色一律描淺邊，避免中性色被壓濁變灰
   const lum = 0.299*g.base[0] + 0.587*g.base[1] + 0.114*g.base[2];
-  const rim = lum > 150 ? mix(g.base, 0, 0.55) : mix(g.base, 255, 0.6);
-  ctx.globalAlpha = 0.5; ctx.lineWidth = Math.max(0.8, r*0.18); ctx.strokeStyle = rgbStr(rim);
-  _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.stroke(); ctx.globalAlpha = 1;
+  if (lum > 195) {                                  // 近白／淺米沙：淺底需要深邊才讀得出
+    ctx.globalAlpha = 0.4; ctx.lineWidth = Math.max(0.8, r*0.16); ctx.strokeStyle = rgbStr(mix(g.base, 0, 0.4));
+    _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.stroke(); ctx.globalAlpha = 1;
+  } else {                                          // 其餘色：淡淺邊提輪廓，不弄濁顏色
+    ctx.globalAlpha = 0.32; ctx.lineWidth = Math.max(0.7, r*0.14); ctx.strokeStyle = rgbStr(mix(g.base, 255, 0.5));
+    _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.stroke(); ctx.globalAlpha = 1;
+  }
   ctx.globalAlpha = 0.55; ctx.fillStyle = rgbStr(g.hi);
   ctx.beginPath(); ctx.arc(x-r*0.3, y-r*0.32, r*0.22, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
   if (sd > 0.9){ ctx.globalAlpha = 0.85; ctx.fillStyle = rgbStr(mix(g.hi,255,0.45));
@@ -1093,44 +1101,44 @@ const Sound = {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this._noise = buf;
   },
-  pour() {                                    // 倒沙：中低頻白噪＋較長尾巴＝厚實沙落聲（不那麼俐落）
+  pour() {                                    // 倒沙：沙鈴一甩——明亮顆粒爆發、快起快收
     if (this.muted || !this.ctx) return;
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1600;
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3200;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 6500; bp.Q.value = 1.1;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.26, t + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.0006, t + 0.6);
-    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
-    src.start(t); src.stop(t + 0.66);
+    g.gain.linearRampToValueAtTime(0.3, t + 0.008);   // 幾乎瞬間起音＝沙鈴的「唰」
+    g.gain.exponentialRampToValueAtTime(0.0006, t + 0.26);
+    src.connect(hp); hp.connect(bp); bp.connect(g); g.connect(this.ctx.destination);
+    src.start(t); src.stop(t + 0.3);
   },
-  _ensureSlide() {                            // 建立持續滑沙音源（只建一次）＝低通綿長浪聲＋緩慢湧退
+  _ensureSlide() {                            // 持續滑沙＝雨聲棒(rainstick)：明亮綿密的唰唰＋細碎顆粒抖動
     if (this._slideGain || !this.ctx) return;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1900; lp.Q.value = 0.3;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 500;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 8500;
     const g = this.ctx.createGain(); g.gain.value = 0;
-    // LFO：緩慢起伏疊在主音量上，深度收斂後更接近「沙沙摩擦」而非浪聲
-    const lfo = this.ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.5;
-    const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 0.22;  // 起伏深度（收斂，較不海）
-    const swell = this.ctx.createGain(); swell.gain.value = 1;
-    lfo.connect(lfoGain); lfoGain.connect(swell.gain);
-    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(swell); swell.connect(this.ctx.destination);
+    // 快速細抖(~13Hz)＝沙粒一顆顆滾落的顆粒感，不是平滑的浪
+    const lfo = this.ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 13;
+    const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 0.35;
+    const flutter = this.ctx.createGain(); flutter.gain.value = 1;
+    lfo.connect(lfoGain); lfoGain.connect(flutter.gain);
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(flutter); flutter.connect(this.ctx.destination);
     src.start(); lfo.start();
     this._slideGain = g;
   },
-  slideOn() {                                 // 有沙在動：緩緩漸入（綿長，不突兀）
+  slideOn() {                                 // 有沙在動：快速漸入（沙鈴持續搖的綿密感）
     if (this.muted || !this.ctx) return;
     this._ensureSlide();
     this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this._slideGain.gain.setTargetAtTime(0.07, this.ctx.currentTime, 0.25);
+    this._slideGain.gain.setTargetAtTime(0.06, this.ctx.currentTime, 0.08);
   },
-  slideOff() {                                // 沙靜止：緩緩退去
+  slideOff() {                                // 沙靜止：較快收掉（沙不動就不該再唰）
     if (!this._slideGain) return;
     this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this._slideGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
+    this._slideGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.13);
   },
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
@@ -1469,6 +1477,15 @@ document.addEventListener('pointerdown', (e) => {
 // 主題（面板內）
 document.getElementById('panelTheme').querySelectorAll('.segBtn').forEach(b => {
   b.addEventListener('click', () => applyTheme(b.dataset.theme));
+});
+
+// 清除已完成紀錄（收藏）
+document.getElementById('clearRecBtn').addEventListener('click', () => {
+  if (!Object.keys(COMPLETED).length) { alert('目前沒有已完成的紀錄'); return; }
+  if (!confirm('確定清除所有已完成紀錄嗎？此動作無法復原。')) return;
+  COMPLETED = {}; saveCompleted();
+  if (typeof buildGrid === 'function') buildGrid();   // 畫廊的滿彩卡會變回剪影
+  openPanel(false);
 });
 
 // 開始一個圖案
