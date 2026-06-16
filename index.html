@@ -1101,39 +1101,40 @@ const Sound = {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this._noise = buf;
   },
-  pour() {                                    // 倒沙：沙鈴一甩——明亮顆粒爆發、快起快收
+  // 共用：建立「明亮沙噪」濾鏡鏈（依真實沙聲頻譜：低頻全砍、能量集中高頻）
+  _sandChain() {
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000; hp.Q.value = 0.5;
+    const tilt = this.ctx.createBiquadFilter(); tilt.type = 'highshelf'; tilt.frequency.value = 9000; tilt.gain.value = 9;  // 抬升極高頻＝真實沙聲 16k+ 的亮峰
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 15000;     // 收掉刺耳極端，仍保留明亮
+    hp.connect(tilt); tilt.connect(lp);
+    return { in: hp, out: lp };
+  },
+  pour() {                                    // 倒沙：一陣明亮沙噪爆發、快起、自然衰減（無低頻、無脈衝）
     if (this.muted || !this.ctx) return;
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3200;
-    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 6500; bp.Q.value = 1.1;
+    const ch = this._sandChain();
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.3, t + 0.008);   // 幾乎瞬間起音＝沙鈴的「唰」
-    g.gain.exponentialRampToValueAtTime(0.0006, t + 0.26);
-    src.connect(hp); hp.connect(bp); bp.connect(g); g.connect(this.ctx.destination);
-    src.start(t); src.stop(t + 0.3);
+    g.gain.linearRampToValueAtTime(0.34, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.42);
+    src.connect(ch.in); ch.out.connect(g); g.connect(this.ctx.destination);
+    src.start(t); src.stop(t + 0.46);
   },
-  _ensureSlide() {                            // 持續滑沙＝雨聲棒(rainstick)：明亮綿密的唰唰＋細碎顆粒抖動
+  _ensureSlide() {                            // 持續滑沙：平穩明亮沙噪（依數據＝連續、無規律脈衝）
     if (this._slideGain || !this.ctx) return;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400;
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 8500;
+    const ch = this._sandChain();
     const g = this.ctx.createGain(); g.gain.value = 0;
-    // 快速細抖(~13Hz)＝沙粒一顆顆滾落的顆粒感，不是平滑的浪
-    const lfo = this.ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 13;
-    const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 0.35;
-    const flutter = this.ctx.createGain(); flutter.gain.value = 1;
-    lfo.connect(lfoGain); lfoGain.connect(flutter.gain);
-    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(flutter); flutter.connect(this.ctx.destination);
-    src.start(); lfo.start();
+    src.connect(ch.in); ch.out.connect(g); g.connect(this.ctx.destination);
+    src.start();
     this._slideGain = g;
   },
-  slideOn() {                                 // 有沙在動：快速漸入（沙鈴持續搖的綿密感）
+  slideOn() {                                 // 有沙在動：漸入平穩沙噪
     if (this.muted || !this.ctx) return;
     this._ensureSlide();
     this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this._slideGain.gain.setTargetAtTime(0.06, this.ctx.currentTime, 0.08);
+    this._slideGain.gain.setTargetAtTime(0.055, this.ctx.currentTime, 0.1);
   },
   slideOff() {                                // 沙靜止：較快收掉（沙不動就不該再唰）
     if (!this._slideGain) return;
