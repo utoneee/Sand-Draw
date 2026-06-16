@@ -346,21 +346,6 @@
         </div>
       </div>
       <div class="tpGrp">
-        <div class="ctlLabel">沙子造型</div>
-        <div class="seg" id="panelGrain">
-          <button class="segBtn sel" data-shape="angular"><svg viewBox="0 0 40 40" aria-hidden="true"><polygon points="20,4 32,11 36,25 26,36 10,33 4,17"></polygon></svg>多角</button>
-          <button class="segBtn" data-shape="faceted"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="9" width="22" height="22" rx="2" transform="rotate(45 20 20)"></rect></svg>方菱</button>
-        </div>
-      </div>
-      <div class="tpGrp">
-        <div class="ctlLabel">沙粒大小</div>
-        <div class="sizeRow">
-          <span class="cap">細</span>
-          <input id="sizeRange" type="range" min="0" max="100" value="40">
-          <span class="cap">粗</span>
-        </div>
-      </div>
-      <div class="tpGrp">
         <div class="ctlLabel">主題</div>
         <div class="seg" id="panelTheme">
           <button class="segBtn sel" data-theme="dark">深灰</button>
@@ -435,13 +420,6 @@
       </div>
       <button id="focNext" class="focNav">›</button>
     </div>
-    <div class="focGrain">
-      <span>沙子造型</span>
-      <div class="focToggle" id="focGrain">
-        <button class="gOpt sel" data-shape="angular">多角</button>
-        <button class="gOpt" data-shape="faceted">方菱</button>
-      </div>
-    </div>
     <div class="focDots" id="focDots"></div>
     <button id="focStart" class="focStart">開始這一幅</button>
     <div class="focTilt" id="focTilt"></div>
@@ -456,8 +434,9 @@
 // 設定
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
-const MAX_PARTICLES = 440;
-const SCOOP_AMOUNT = 200;
+const MAX_PARTICLES = 700;       // 沙變細後提高上限，讓「一坨沙」夠份量
+const SCOOP_AMOUNT = 300;        // 單次倒沙量（配合細沙加量）
+const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
 const STICK_CHANCE = 0.3;        // 黏贴機率（越高＝沙黏得越多、填得越滿）
 const ACCEL = 0.9;               // 重力加速係數
 const DAMP = 0.8;                // 阻尼（低＝摩擦大、會停下不飄）
@@ -485,7 +464,7 @@ const THEMES = {
     trayA:'#f1ece1', trayB:'#e7e0d1',
     woodGrain:'rgba(120,110,90,.08)', woodHi:'rgba(255,255,255,.5)',
     film:'#d7cfbd', filmHi:'rgba(255,255,255,.55)',
-    peeled:'#ddd4bf',                                  // 中性卡其，白沙與黑沙都讀得到
+    peeled:'#c6bb9e',                                  // 加深卡其：與白沙拉開明度差，白沙浮得出來
     fiberDark:'rgba(120,110,90,.06)', fiberLight:'rgba(255,255,255,.5)',
     diecut:'#b3a98f',
     thumbPaper:'#e2d9c6', silTone:'#b4a288',          // 剪影卡：米紙底 + 棕调鬼影
@@ -684,8 +663,8 @@ function grainShades(hex){
 
 // ── 多角細沙：每色預烘焙數張「顆粒團」貼圖，drawImage 取代逐顆描路徑 ──
 //   顆粒造型：'angular' = 多角不規則（預設）｜'faceted' = 方菱小面（可在開始畫面切換）
-let GRAIN_SHAPE = 'angular';
-let SAND_SIZE = 1;                // 沙粒大小倒率（遊玩中可調）
+let GRAIN_SHAPE = 'angular';      // 固定多角（方菱外觀差異不大，已移除切換）
+const SAND_SIZE = 0.6;            // 沙粒大小（固定；要改大小直接調此值）
 const GRAIN_SCALE = 0.7;          // 顆粒相對大小（70%）：每團裝多顆更細的沙
 const RP = 7;                     // sprite 內顆粒基準半徑
 const SPRITE = 20;                // sprite 畫布尺寸（含陰影/高光邊距）
@@ -720,8 +699,10 @@ function _drawOneGrain(ctx, x, y, r, g, sd, shape){
   const grd = ctx.createRadialGradient(x-r*0.3, y-r*0.34, r*0.08, x, y, r);
   grd.addColorStop(0, rgbStr(mix(jb,255,0.22))); grd.addColorStop(0.55, rgbStr(jb)); grd.addColorStop(1, rgbStr(mix(jb,0,0.16)));
   ctx.fillStyle = grd; _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.fill();
-  // 淺色細邊：深色沙在深底也讀得出輪廓（搭上面的接觸陰影 → 深、淺底都看得見）
-  ctx.globalAlpha = 0.38; ctx.lineWidth = Math.max(0.7, r*0.16); ctx.strokeStyle = rgbStr(mix(g.base,255,0.55));
+  // 反差細邊：依顆粒自身明暗取反向描邊 → 白沙在淺底描深邊、黑沙在深底描淺邊，任何介面都讀得出
+  const lum = 0.299*g.base[0] + 0.587*g.base[1] + 0.114*g.base[2];
+  const rim = lum > 150 ? mix(g.base, 0, 0.55) : mix(g.base, 255, 0.6);
+  ctx.globalAlpha = 0.5; ctx.lineWidth = Math.max(0.8, r*0.18); ctx.strokeStyle = rgbStr(rim);
   _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.stroke(); ctx.globalAlpha = 1;
   ctx.globalAlpha = 0.55; ctx.fillStyle = rgbStr(g.hi);
   ctx.beginPath(); ctx.arc(x-r*0.3, y-r*0.32, r*0.22, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
@@ -944,7 +925,7 @@ class ParticleSystem {
             if (j <= i) continue;
             const b = L[j];
             let dx = b.x - a.x, dy = b.y - a.y;
-            const min = a.r + b.r;
+            const min = (a.r + b.r) * PACK;
             let d2 = dx * dx + dy * dy;
             if (d2 >= min * min || d2 === 0) {
               if (d2 === 0) { dx = (Math.random() - 0.5) * 0.5; dy = (Math.random() - 0.5) * 0.5; d2 = dx * dx + dy * dy; }
@@ -968,6 +949,9 @@ class ParticleSystem {
   }
   draw(ctx) {
     for (const s of this.list) {
+      // 先鋪一塊實心底圓＝找回美化前的團塊體積感，再疊顆粒紋理（保留美化質感）
+      ctx.fillStyle = rgbStr(grainShades(s.c).base);
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 0.92, 0, 7); ctx.fill();
       paintGrain(ctx, s.x, s.y, s.r, s.c);   // 散沙：顆粒明暗 + 微高光
     }
   }
@@ -1109,38 +1093,44 @@ const Sound = {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this._noise = buf;
   },
-  pour() {                                    // 倒沙：高頻脈衝白噪＝沙粒打底聲
+  pour() {                                    // 倒沙：中低頻白噪＋較長尾巴＝厚實沙落聲（不那麼俐落）
     if (this.muted || !this.ctx) return;
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6500;
-    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 9000; bp.Q.value = 0.4;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1600;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.28, t + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.22);
-    src.connect(hp); hp.connect(bp); bp.connect(g); g.connect(this.ctx.destination);
-    src.start(t); src.stop(t + 0.28);
+    g.gain.linearRampToValueAtTime(0.26, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0006, t + 0.6);
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
+    src.start(t); src.stop(t + 0.66);
   },
-  _ensureSlide() {                            // 建立持續滑沙音源（只建一次）
+  _ensureSlide() {                            // 建立持續滑沙音源（只建一次）＝低通綿長浪聲＋緩慢湧退
     if (this._slideGain || !this.ctx) return;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300; lp.Q.value = 0.3;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 300;
     const g = this.ctx.createGain(); g.gain.value = 0;
-    src.connect(hp); hp.connect(g); g.connect(this.ctx.destination);
-    src.start();
+    // LFO：~0.35Hz 緩慢起伏，疊在主音量上＝浪一波波拍上沙面的湧退感
+    const lfo = this.ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.35;
+    const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 0.5;   // 起伏深度（相對 _slideLevel）
+    const swell = this.ctx.createGain(); swell.gain.value = 1;
+    lfo.connect(lfoGain); lfoGain.connect(swell.gain);
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(swell); swell.connect(this.ctx.destination);
+    src.start(); lfo.start();
     this._slideGain = g;
   },
-  slideOn() {                                 // 有沙在動：漸入沙子滑動聲
+  slideOn() {                                 // 有沙在動：緩緩漸入（綿長，不突兀）
     if (this.muted || !this.ctx) return;
     this._ensureSlide();
     this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this._slideGain.gain.setTargetAtTime(0.038, this.ctx.currentTime, 0.06);
+    this._slideGain.gain.setTargetAtTime(0.07, this.ctx.currentTime, 0.25);
   },
-  slideOff() {                                // 沙靜止：漸出
+  slideOff() {                                // 沙靜止：緩緩退去
     if (!this._slideGain) return;
     this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this._slideGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.18);
+    this._slideGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
   },
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
@@ -1440,12 +1430,6 @@ document.getElementById('focNext').addEventListener('click', () => { focIdx = (f
 document.getElementById('focShuffle').addEventListener('click', () => { focIdx = Math.floor(Math.random() * PKEYS.length); renderFocus(); });
 document.getElementById('focBack').addEventListener('click', () => { focusEl.classList.remove('show'); gallery.classList.add('show'); });
 
-// 顆粒造型（聚焦頁）— 與工具面板同步
-const focGrain = document.getElementById('focGrain');
-focGrain.querySelectorAll('.gOpt').forEach(opt => {
-  opt.addEventListener('click', () => { setGrainShape(opt.dataset.shape); syncShapeUI(opt.dataset.shape); });
-});
-
 // 開始這一幅（順便請求傾斜權限）
 document.getElementById('focStart').addEventListener('click', async () => {
   const ok = await requestTilt();
@@ -1475,18 +1459,11 @@ function openPanel(o) { toolPanel.classList.toggle('open', o); gearBtn.classList
 gearBtn.addEventListener('click', () => openPanel(!toolPanel.classList.contains('open')));
 document.getElementById('tpClose').addEventListener('click', () => openPanel(false));
 tiltBtn.addEventListener('click', requestTilt);
-
-// 造型：面板與聚焦頁共用選取狀態
-function syncShapeUI(shape) {
-  document.querySelectorAll('#panelGrain .segBtn, #focGrain .gOpt').forEach(el => el.classList.toggle('sel', el.dataset.shape === shape));
-}
-document.getElementById('panelGrain').querySelectorAll('.segBtn').forEach(b => {
-  b.addEventListener('click', () => { setGrainShape(b.dataset.shape); syncShapeUI(b.dataset.shape); });
-});
-
-// 沙粒大小（0.6–1.7 倍）
-document.getElementById('sizeRange').addEventListener('input', (e) => {
-  SAND_SIZE = 0.6 + (e.target.value / 100) * 1.1;
+// 點面板與齒輪以外的空白處 → 收起設定面板
+document.addEventListener('pointerdown', (e) => {
+  if (!toolPanel.classList.contains('open')) return;
+  if (toolPanel.contains(e.target) || gearBtn.contains(e.target)) return;
+  openPanel(false);
 });
 
 // 主題（面板內）
