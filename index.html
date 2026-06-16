@@ -336,7 +336,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/17 00:06</span>
+      <span class="ovUpd" id="ovUpd2">更新 06/17 00:59</span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -392,7 +392,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/17 00:06</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/17 00:59</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -1105,25 +1105,27 @@ const Sound = {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this._noise = buf;
   },
-  pour() {                                    // 倒沙：扎實悶響（挖土／踩雪）——快起、快收、尾端稀疏輕落
+  pour() {                                    // 倒沙：依參考檔＝一段持續約1秒的「沙流」（漸起→維持→漸收），非短促拋落
     if (this.muted || !this.ctx) return;
     if (this.ctx.state === 'suspended') this.ctx.resume();
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 160;
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1300; lp.Q.value = 0.3;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 150;
+    const peak = this.ctx.createBiquadFilter(); peak.type = 'peaking'; peak.frequency.value = 3500; peak.Q.value = 0.7; peak.gain.value = 3;  // 參考檔的 2–8k 沙流主體
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000; lp.Q.value = 0.3;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.1, t + 0.05);               // 起音放軟＝悶落，不是「拋」的銳起
-    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.2);        // 緊湊收尾，不拖長尾＝不像拋撒
-    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
-    src.start(t); src.stop(t + 0.24);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.09);             // 柔和漸起（不是「拋」的銳起）
+    g.gain.setValueAtTime(0.12, t + 0.42);                      // 維持＝持續的傾倒流
+    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.82);      // 漸收
+    src.connect(hp); hp.connect(peak); peak.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
+    src.start(t); src.stop(t + 0.86);
   },
   _ensureSlide() {                            // 持續滑沙：輕柔毛毛雨——提亮去悶、降低音量
     if (this._slideGain || !this.ctx) return;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 380;
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2100; lp.Q.value = 0.3;  // 收掉高頻嘶聲＝更乾淨細柔
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1500;  // 砍掉低中頻＝去除「推紙箱摩擦地面」感
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000; lp.Q.value = 0.3;  // 保留高頻細聲（依沙子4＝又細又輕）
     const g = this.ctx.createGain(); g.gain.value = 0;
     src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
     src.start();
@@ -1133,7 +1135,7 @@ const Sound = {
     if (this.muted || !this.ctx) { if (this._slideGain) this._slideGain.gain.setTargetAtTime(0, this.ctx ? this.ctx.currentTime : 0, 0.1); return; }
     if (this.ctx.state === 'suspended') this.ctx.resume();   // 完成後若被掛起，自我喚醒，滑沙不會消失
     this._ensureSlide();
-    const target = Math.min(1, Math.max(0, level)) * 0.015;  // 再降量＝更細更柔更乾淨
+    const target = Math.min(1, Math.max(0, level)) * 0.02;   // 高頻細聲，音量保持輕
     this._slideGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.12);
   },
   slideOff() {                                // 立即收掉（清沙／換圖／完成時）
