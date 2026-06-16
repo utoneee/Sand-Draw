@@ -1102,45 +1102,40 @@ const Sound = {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this._noise = buf;
   },
-  // 共用：建立「明亮沙噪」濾鏡鏈（依真實沙聲頻譜：低頻全砍、能量集中高頻）
-  _sandChain() {
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3000; hp.Q.value = 0.5;
-    const tilt = this.ctx.createBiquadFilter(); tilt.type = 'highshelf'; tilt.frequency.value = 9000; tilt.gain.value = 9;  // 抬升極高頻＝真實沙聲 16k+ 的亮峰
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 15000;     // 收掉刺耳極端，仍保留明亮
-    hp.connect(tilt); tilt.connect(lp);
-    return { in: hp, out: lp };
-  },
-  pour() {                                    // 倒沙：一陣明亮沙噪爆發、快起、自然衰減（無低頻、無脈衝）
+  pour() {                                    // 倒沙：柔和的一陣沙落——低中頻為主、起音不硬、自然衰減
     if (this.muted || !this.ctx) return;
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const ch = this._sandChain();
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 350;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;   // 砍掉高頻嘶聲＝不再像煎牛排
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.34, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.42);
-    src.connect(ch.in); ch.out.connect(g); g.connect(this.ctx.destination);
-    src.start(t); src.stop(t + 0.46);
+    g.gain.linearRampToValueAtTime(0.22, t + 0.05);    // 起音放慢＝不硬
+    g.gain.exponentialRampToValueAtTime(0.0005, t + 0.5);
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
+    src.start(t); src.stop(t + 0.55);
   },
-  _ensureSlide() {                            // 持續滑沙：平穩明亮沙噪（依數據＝連續、無規律脈衝）
+  _ensureSlide() {                            // 持續滑沙：低頻柔和摩擦聲（療癒／枯山水推石）——低通＋低中頻峰
     if (this._slideGain || !this.ctx) return;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const ch = this._sandChain();
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 180;
+    const peak = this.ctx.createBiquadFilter(); peak.type = 'peaking'; peak.frequency.value = 520; peak.Q.value = 0.8; peak.gain.value = 4;  // 低中頻的「摩擦body」
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.4;  // 悶、柔、無嘶聲
     const g = this.ctx.createGain(); g.gain.value = 0;
-    src.connect(ch.in); ch.out.connect(g); g.connect(this.ctx.destination);
+    src.connect(hp); hp.connect(peak); peak.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
     src.start();
     this._slideGain = g;
   },
-  slideOn() {                                 // 有沙在動：漸入平穩沙噪
-    if (this.muted || !this.ctx) return;
+  setSlide(level) {                           // 每幀依「移動中沙量」設定滑沙音量（0=靜音）；越少沙越輕
+    if (this.muted || !this.ctx) { if (this._slideGain) this._slideGain.gain.setTargetAtTime(0, this.ctx ? this.ctx.currentTime : 0, 0.1); return; }
     this._ensureSlide();
-    this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this._slideGain.gain.setTargetAtTime(0.055, this.ctx.currentTime, 0.1);
+    const target = Math.min(1, Math.max(0, level)) * 0.075;
+    this._slideGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.12);
   },
-  slideOff() {                                // 沙靜止：較快收掉（沙不動就不該再唰）
-    if (!this._slideGain) return;
+  slideOff() {                                // 立即收掉（清沙／換圖／完成時）
+    if (!this._slideGain || !this.ctx) return;
     this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this._slideGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.13);
+    this._slideGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
   },
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
@@ -1499,7 +1494,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 
 // 開始一個圖案
 function startPattern(key) {
-  Sound.init(); Sound.slideOff(); _slideWasMoving = false;  // 切換圖案時重置滑沙聲
+  Sound.init(); Sound.slideOff();   // 切換圖案時重置滑沙聲
   currentKey = key;
   layers = new LayerManager(PATTERNS[key]);
   particles.clear();
@@ -1516,7 +1511,7 @@ function startPattern(key) {
 
 // 回到畫廊
 function showPicker() {
-  Sound.slideOff(); _slideWasMoving = false;
+  Sound.slideOff();
   // 離開一幅已完成的作品時，用「當下更滿的版本」覆蓋存檔的縮圖
   if (won && currentKey) {
     const at = (COMPLETED[currentKey] && COMPLETED[currentKey].at) || Date.now();
@@ -1541,18 +1536,16 @@ function playReveal() {
 
 // 主迴圈
 const progressBar = document.getElementById('progressBar');
-let _slideWasMoving = false;
 function loop() {
   const g = input.gravity();
   particles.step(g.x, g.y, layers, stuckCtx);
-  // 滑沙聲：只有使用者主動傾斜／拖曳且沙在動時才播
-  if (layers && particles.list.length > 0) {
-    const userTilting = input.manual !== null || input.tilt || input._keys.x !== 0 || input._keys.y !== 0;
-    const moving = userTilting && particles.list.some(p => !p.sleep);
-    if (moving !== _slideWasMoving) {
-      _slideWasMoving = moving;
-      if (moving) Sound.slideOn(); else Sound.slideOff();
-    }
+  // 滑沙聲：每幀依「實際移動的沙量」決定音量 → 沙停就靜、沙越少越輕（不再靠睡眠旗標誤判）
+  if (!won && layers) {
+    let act = 0;
+    for (const p of particles.list) { const sp = Math.abs(p.vx) + Math.abs(p.vy); if (sp > REST_SPEED) act += sp; }
+    Sound.setSlide(act / 130);   // 130＝歸一化基準（一坨沙滑動約到 1.0），可微調
+  } else {
+    Sound.setSlide(0);
   }
   mainCtx.clearRect(0, 0, W, H);
   particles.draw(mainCtx);
@@ -1572,13 +1565,12 @@ function loop() {
 loop();
 
 // 控制鈕
-document.getElementById('dumpBtn').addEventListener('click', () => { particles.clear(); Sound.slideOff(); _slideWasMoving = false; });
+document.getElementById('dumpBtn').addEventListener('click', () => { particles.clear(); Sound.slideOff(); });
 (() => {
   const muteBtn = document.getElementById('muteBtn');
   muteBtn.addEventListener('click', () => {
     const m = Sound.toggle();
     muteBtn.textContent = m ? '🔇' : '🔊';
-    if (!m) _slideWasMoving = false;   // 重新評估，避免解靜音後狀態卡住
   });
 })();
 document.getElementById('changeBtn').addEventListener('click', () => {
