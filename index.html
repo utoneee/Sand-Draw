@@ -91,7 +91,7 @@
   /* 沙盤 + 側欄 */
   .playRow { display: flex; gap: 12px; align-items: stretch; }
   .sandwell {
-    position: relative; flex: 1; aspect-ratio: 1/1;
+    position: relative; flex: 1; aspect-ratio: 1/1; align-self: flex-start;
     border-radius: var(--wellRadius); padding: var(--rimPad); background: var(--wellRim);
     box-shadow: inset 0 2px 5px rgba(0,0,0,.22), inset 0 -1px 2px rgba(255,255,255,.22);
   }
@@ -615,6 +615,13 @@ const PATTERNS = {
     svgRegion('#d9667a', HEART_D),
     svgRegion(OUTLINE_COLOR, HEART_D, { stroke:true, lw: OUTLINE_LW }),
   ]},
+  sun: { name:'太陽', en:'SUN', tag:'天象', regions:[
+    svgRegion('#c8b48a', 'M 95,240 a 145,145 0 1,0 290,0 a 145,145 0 1,0 -290,0 Z'),
+    svgRegion('#b46040', 'M 202.5,99.9 Q 217.2,66.5 240,45 Q 262.8,66.5 277.5,99.9 Z M 312.5,114.4 Q 346.5,101.2 377.9,102.1 Q 378.8,133.5 365.6,167.5 Z M 380.1,202.5 Q 413.5,217.2 435,240 Q 413.5,262.8 380.1,277.5 Z M 365.6,312.5 Q 378.8,346.5 377.9,377.9 Q 346.5,378.8 312.5,365.6 Z M 277.5,380.1 Q 262.8,413.5 240,435 Q 217.2,413.5 202.5,380.1 Z M 167.5,365.6 Q 133.5,378.8 102.1,377.9 Q 101.2,346.5 114.4,312.5 Z M 99.9,277.5 Q 66.5,262.8 45,240 Q 66.5,217.2 99.9,202.5 Z M 114.4,167.5 Q 101.2,133.5 102.1,102.1 Q 133.5,101.2 167.5,114.4 Z'),
+    svgRegion('#c8a050', 'M 145,240 a 95,95 0 1,0 190,0 a 95,95 0 1,0 -190,0 Z'),
+    svgRegion('#f2e4c8', 'M 185,240 a 55,55 0 1,0 110,0 a 55,55 0 1,0 -110,0 Z'),
+    svgRegion(OUTLINE_COLOR, 'M 202.5,99.9 Q 217.2,66.5 240,45 Q 262.8,66.5 277.5,99.9 A 145,145 0 0 1 312.5,114.4 Q 346.5,101.2 377.9,102.1 Q 378.8,133.5 365.6,167.5 A 145,145 0 0 1 380.1,202.5 Q 413.5,217.2 435,240 Q 413.5,262.8 380.1,277.5 A 145,145 0 0 1 365.6,312.5 Q 378.8,346.5 377.9,377.9 Q 346.5,378.8 312.5,365.6 A 145,145 0 0 1 277.5,380.1 Q 262.8,413.5 240,435 Q 217.2,413.5 202.5,380.1 A 145,145 0 0 1 167.5,365.6 Q 133.5,378.8 102.1,377.9 Q 101.2,346.5 114.4,312.5 A 145,145 0 0 1 99.9,277.5 Q 66.5,262.8 45,240 Q 66.5,217.2 99.9,202.5 A 145,145 0 0 1 114.4,167.5 Q 101.2,133.5 102.1,102.1 Q 133.5,101.2 167.5,114.4 A 145,145 0 0 1 202.5,99.9 Z M 145,240 a 95,95 0 1,0 190,0 a 95,95 0 1,0 -190,0 Z M 185,240 a 55,55 0 1,0 110,0 a 55,55 0 1,0 -110,0 Z', { stroke:true, lw: OUTLINE_LW }),
+  ]},
 };
 
 // 遮罩式區塊：把一張白色遮罩 canvas 染成指定顏色（依 mask+color 快取，免每幀重算）
@@ -1090,7 +1097,7 @@ let currentKey = null;
 
 // ── 音效（Web Audio 即時合成，無外部檔案）──
 const Sound = {
-  ctx: null, muted: false, _noise: null,
+  ctx: null, muted: false, _noise: null, _slideGain: null,
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1099,20 +1106,41 @@ const Sound = {
     const len = Math.floor(this.ctx.sampleRate * 1.0);
     const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;   // 白噪，給倒沙聲用
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this._noise = buf;
   },
-  pour() {                                    // 倒沙：帶通白噪 + 衰減包絡＝沙沙聲
+  pour() {                                    // 倒沙：高頻脈衝白噪＝沙粒打底聲
     if (this.muted || !this.ctx) return;
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.7;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6500;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 9000; bp.Q.value = 0.4;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.18, t + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.55);
-    src.connect(bp); bp.connect(g); g.connect(this.ctx.destination);
-    src.start(t); src.stop(t + 0.62);
+    g.gain.linearRampToValueAtTime(0.28, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.22);
+    src.connect(hp); hp.connect(bp); bp.connect(g); g.connect(this.ctx.destination);
+    src.start(t); src.stop(t + 0.28);
+  },
+  _ensureSlide() {                            // 建立持續滑沙音源（只建一次）
+    if (this._slideGain || !this.ctx) return;
+    const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400;
+    const g = this.ctx.createGain(); g.gain.value = 0;
+    src.connect(hp); hp.connect(g); g.connect(this.ctx.destination);
+    src.start();
+    this._slideGain = g;
+  },
+  slideOn() {                                 // 有沙在動：漸入沙子滑動聲
+    if (this.muted || !this.ctx) return;
+    this._ensureSlide();
+    this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this._slideGain.gain.setTargetAtTime(0.038, this.ctx.currentTime, 0.06);
+  },
+  slideOff() {                                // 沙靜止：漸出
+    if (!this._slideGain) return;
+    this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this._slideGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.18);
   },
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
@@ -1127,7 +1155,12 @@ const Sound = {
       o.start(t); o.stop(t + 1.0);
     });
   },
-  toggle() { this.muted = !this.muted; if (!this.muted) this.init(); return this.muted; },
+  toggle() {
+    this.muted = !this.muted;
+    if (this.muted) { this.slideOff(); }
+    else { this.init(); }
+    return this.muted;
+  },
 };
 
 // ── 成就：本機儲存「已完成」作品＋快照（重開還在，不需登入）──
@@ -1302,7 +1335,7 @@ function drawSavedThumb(canvas, dataUrl, S) {
 }
 
 // 分類 chips
-const CATS = ['全部','冥想','山景','水波','夜空','靜物','水果'];
+const CATS = ['全部','冥想','山景','水波','夜空','靜物','水果','天象'];
 let activeCat = '全部';
 CATS.forEach(cat => {
   const c = document.createElement('button');
@@ -1463,7 +1496,7 @@ document.getElementById('panelTheme').querySelectorAll('.segBtn').forEach(b => {
 
 // 開始一個圖案
 function startPattern(key) {
-  Sound.init();                      // 進遊戲時用點擊手勢解鎖音訊
+  Sound.init(); Sound.slideOff(); _slideWasMoving = false;  // 切換圖案時重置滑沙聲
   currentKey = key;
   layers = new LayerManager(PATTERNS[key]);
   particles.clear();
@@ -1480,6 +1513,7 @@ function startPattern(key) {
 
 // 回到畫廊
 function showPicker() {
+  Sound.slideOff(); _slideWasMoving = false;
   // 離開一幅已完成的作品時，用「當下更滿的版本」覆蓋存檔的縮圖
   if (won && currentKey) {
     const at = (COMPLETED[currentKey] && COMPLETED[currentKey].at) || Date.now();
@@ -1504,9 +1538,19 @@ function playReveal() {
 
 // 主迴圈
 const progressBar = document.getElementById('progressBar');
+let _slideWasMoving = false;
 function loop() {
   const g = input.gravity();
   particles.step(g.x, g.y, layers, stuckCtx);
+  // 滑沙聲：只有使用者主動傾斜／拖曳且沙在動時才播
+  if (layers && particles.list.length > 0) {
+    const userTilting = input.manual !== null || input.tilt || input._keys.x !== 0 || input._keys.y !== 0;
+    const moving = userTilting && particles.list.some(p => !p.sleep);
+    if (moving !== _slideWasMoving) {
+      _slideWasMoving = moving;
+      if (moving) Sound.slideOn(); else Sound.slideOff();
+    }
+  }
   mainCtx.clearRect(0, 0, W, H);
   particles.draw(mainCtx);
   if (layers) {
@@ -1515,6 +1559,7 @@ function loop() {
     if (!won && layers.allPeeled() && r >= WIN_RATIO) {
       won = true;
       if (currentKey) { COMPLETED[currentKey] = { thumb: captureSnapshot(), at: Date.now() }; saveCompleted(); }
+      Sound.slideOff();
       Sound.ding();
       playReveal();
     }
@@ -1524,10 +1569,14 @@ function loop() {
 loop();
 
 // 控制鈕
-document.getElementById('dumpBtn').addEventListener('click', () => particles.clear());
+document.getElementById('dumpBtn').addEventListener('click', () => { particles.clear(); Sound.slideOff(); _slideWasMoving = false; });
 (() => {
   const muteBtn = document.getElementById('muteBtn');
-  muteBtn.addEventListener('click', () => { const m = Sound.toggle(); muteBtn.textContent = m ? '🔇' : '🔊'; });
+  muteBtn.addEventListener('click', () => {
+    const m = Sound.toggle();
+    muteBtn.textContent = m ? '🔇' : '🔊';
+    if (!m) _slideWasMoving = false;   // 重新評估，避免解靜音後狀態卡住
+  });
 })();
 document.getElementById('changeBtn').addEventListener('click', () => {
   // 已完成（已存起來）或沒進度 → 直接換；有未存的進度才確認
@@ -1548,6 +1597,14 @@ function applyTheme(key) {
 }
 document.getElementById('themeBtnG').addEventListener('click', () => applyTheme(themeKey === 'dark' ? 'light' : 'dark'));
 applyTheme('dark');   // 初始：繪製托盤底色、設定圖示
+
+// 防止雙擊縮放（Safari 在 user-scalable=no 下仍可能觸發）
+let _lastTap = 0;
+document.addEventListener('touchstart', e => {
+  const now = Date.now();
+  if (now - _lastTap < 300) e.preventDefault();
+  _lastTap = now;
+}, { passive: false });
 
 })();
 </script>
