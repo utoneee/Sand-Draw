@@ -336,7 +336,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/17 01:10</span>
+      <span class="ovUpd" id="ovUpd2">更新 06/17 08:43</span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -392,7 +392,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/17 01:10</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/17 08:43</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -1093,7 +1093,7 @@ let currentKey = null;
 
 // ── 音效（Web Audio 即時合成，無外部檔案）──
 const Sound = {
-  ctx: null, muted: false, _noise: null, _slideGain: null,
+  ctx: null, muted: false, _noise: null, _slideOut: null, _grainAcc: 0, _lastGrainT: 0,
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1120,28 +1120,40 @@ const Sound = {
     src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
     src.start(t); src.stop(t + 0.76);
   },
-  _ensureSlide() {                            // 持續滑沙：輕柔毛毛雨——提亮去悶、降低音量
-    if (this._slideGain || !this.ctx) return;
-    const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1500;  // 砍掉低中頻＝去除「推紙箱摩擦地面」感
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000; lp.Q.value = 0.3;  // 保留高頻細聲（依沙子4＝又細又輕）
-    const g = this.ctx.createGain(); g.gain.value = 0;
-    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
-    src.start();
-    this._slideGain = g;
+  _ensureSlideOut() {                         // 滑沙的輸出匯流（顆粒都接到這裡）
+    if (this._slideOut || !this.ctx) return;
+    this._slideOut = this.ctx.createGain(); this._slideOut.gain.value = 1;
+    this._slideOut.connect(this.ctx.destination);
+    this._grainAcc = 0; this._lastGrainT = this.ctx.currentTime;
   },
-  setSlide(level) {                           // 每幀依「移動中沙量」設定滑沙音量（0=靜音）；越少沙越輕
-    if (this.muted || !this.ctx) { if (this._slideGain) this._slideGain.gain.setTargetAtTime(0, this.ctx ? this.ctx.currentTime : 0, 0.1); return; }
-    if (this.ctx.state === 'suspended') this.ctx.resume();   // 完成後若被掛起，自我喚醒，滑沙不會消失
-    this._ensureSlide();
-    const target = Math.min(1, Math.max(0, level)) * 0.02;   // 高頻細聲，音量保持輕
-    this._slideGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.045);  // 反應更快＝貼合沙動瞬間起伏，不死板
+  _grain(now, amp) {                          // 一顆極短沙粒（隨機頻率/音量/長度）→ 疊起來＝沙的顆粒感
+    const dur = 0.013 + Math.random() * 0.03;
+    const src = this.ctx.createBufferSource(); src.buffer = this._noise;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = 2200 + Math.random() * 4500;   // 每顆音色不同＝不死板
+    bp.Q.value = 1.4 + Math.random() * 2.6;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(amp * (0.45 + Math.random() * 0.7), now + 0.0015);
+    g.gain.exponentialRampToValueAtTime(0.0004, now + dur);
+    src.connect(bp); bp.connect(g); g.connect(this._slideOut);
+    const off = Math.random() * (0.96 - dur);          // 從白噪緩衝隨機切一小段
+    src.start(now, Math.max(0, off), dur + 0.02);
   },
-  slideOff() {                                // 立即收掉（清沙／換圖／完成時）
-    if (!this._slideGain || !this.ctx) return;
-    this._slideGain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this._slideGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+  // 每幀依「移動中沙量」灑沙粒：沙多＝密、沙少＝稀疏滴答、靜止＝自然收尾（不硬切）
+  slideTick(activity) {
+    if (this.muted || !this.ctx) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    this._ensureSlideOut();
+    const now = this.ctx.currentTime;
+    let dt = now - this._lastGrainT; this._lastGrainT = now;
+    if (dt < 0 || dt > 0.1) dt = 0.016;
+    const rate = Math.min(200, activity * 1.7);         // 每秒沙粒數 ∝ 沙動程度（飽和上限 200）
+    this._grainAcc += rate * dt;
+    let n = 0;
+    while (this._grainAcc >= 1 && n < 9) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.03); n++; }
   },
+  slideOff() { this._grainAcc = 0; this._lastGrainT = this.ctx ? this.ctx.currentTime : 0; },  // 停止灑粒，殘餘沙粒自然收尾
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
     [523.25, 659.25, 783.99].forEach((f, i) => {
@@ -1544,17 +1556,13 @@ const progressBar = document.getElementById('progressBar');
 function loop() {
   const g = input.gravity();
   particles.step(g.x, g.y, layers, stuckCtx);
-  // 滑沙聲：依「實際移動的沙量」決定音量 → 沙停就靜、沙匯聚靜止後速度歸零自然漸弱
+  // 滑沙聲（顆粒合成）：依「實際移動的沙量」灑沙粒 → 沙多＝密、沙少＝稀疏滴答、匯聚靜止＝自然收尾
   if (layers) {
-    let act = 0, moving = 0;
-    for (const p of particles.list) { const sp = Math.abs(p.vx) + Math.abs(p.vy); if (sp > REST_SPEED) { act += sp; moving++; } }
-    // 用「平均速度×規模」而非單純總和：沙匯聚變密、會動的變少 → 自然變輕
-    let lvl = act / 130;
-    // rainstick 顆粒感：細碎隨機抖動，避免聲音死板（只在有沙動時加）
-    if (moving > 0) lvl *= 0.78 + Math.random() * 0.44;
-    Sound.setSlide(lvl);
+    let act = 0;
+    for (const p of particles.list) { const sp = Math.abs(p.vx) + Math.abs(p.vy); if (sp > REST_SPEED) act += sp; }
+    Sound.slideTick(act);
   } else {
-    Sound.setSlide(0);
+    Sound.slideOff();
   }
   mainCtx.clearRect(0, 0, W, H);
   particles.draw(mainCtx);
