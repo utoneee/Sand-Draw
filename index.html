@@ -336,7 +336,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/17 19:41</span>
+      <span class="ovUpd" id="ovUpd2">更新 06/17 20:02</span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -392,7 +392,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/17 19:41</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/17 20:02</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -817,14 +817,16 @@ function _traceGrain(ctx, cx, cy, r, rot, sd, shape){
 // 在 sprite 上畫一顆有立體感的細沙（接觸陰影＋球體漸層＋亮度抖動＋高光＋偶發反光）
 function _drawOneGrain(ctx, x, y, r, g, sd, shape){
   const rot = sd*6.283;
-  ctx.globalAlpha = 0.17; ctx.fillStyle = rgbStr(g.darkest);   // 接觸陰影減淡，避免整體偏灰
+  const lum = 0.299*g.base[0] + 0.587*g.base[1] + 0.114*g.base[2];
+  const shA = lum > 205 ? 0.05 : 0.17;        // 亮色（白）大幅調淡接觸陰影 → 不再像西米露
+  const edge = lum > 205 ? 0.03 : 0.09;       // 亮色邊緣也少壓暗，白沙乾淨
+  ctx.globalAlpha = shA; ctx.fillStyle = rgbStr(g.darkest);
   _traceGrain(ctx, x+r*0.15, y+r*0.2, r*0.96, rot, sd, shape); ctx.fill(); ctx.globalAlpha = 1;
   const jb = mix(g.base, sd<0.5 ? 0 : 255, _gh(sd, r)*0.12);
   const grd = ctx.createRadialGradient(x-r*0.3, y-r*0.34, r*0.08, x, y, r);
-  grd.addColorStop(0, rgbStr(mix(jb,255,0.24))); grd.addColorStop(0.55, rgbStr(jb)); grd.addColorStop(1, rgbStr(mix(jb,0,0.09)));
+  grd.addColorStop(0, rgbStr(mix(jb,255,0.24))); grd.addColorStop(0.55, rgbStr(jb)); grd.addColorStop(1, rgbStr(mix(jb,0,edge)));
   ctx.fillStyle = grd; _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.fill();
   // 反差細邊：只有近白沙(lum>195)才描深邊解決淺底看不見；其餘大地色一律描淺邊，避免中性色被壓濁變灰
-  const lum = 0.299*g.base[0] + 0.587*g.base[1] + 0.114*g.base[2];
   if (lum > 195) {                                  // 近白／淺米沙：淺底需要深邊才讀得出
     ctx.globalAlpha = 0.4; ctx.lineWidth = Math.max(0.8, r*0.16); ctx.strokeStyle = rgbStr(mix(g.base, 0, 0.4));
     _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.stroke(); ctx.globalAlpha = 1;
@@ -1242,15 +1244,15 @@ const Sound = {
     this._slideOut.connect(this.ctx.destination);
     this._grainAcc = 0; this._lastGrainT = this.ctx.currentTime;
   },
-  _grain(now, amp) {                          // 一顆柔沙粒：較長、軟起音、中頻 → 密疊成綿密靜謐的沙聲（不爆裂）
-    const dur = 0.04 + Math.random() * 0.08;            // 40–120ms，較長＝平滑、不像爆米花
+  _grain(now, amp) {                          // 一顆柔沙粒：更長、更軟起音、更低頻 → 鬆而柔，不再炸物感
+    const dur = 0.06 + Math.random() * 0.10;            // 60–160ms，更長＝更平滑
     const src = this.ctx.createBufferSource(); src.buffer = this._noise;
     const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass';
-    bp.frequency.value = 900 + Math.random() * 1900;    // 中頻：避開高頻的「炸」與低頻的「紙箱」
-    bp.Q.value = 0.5 + Math.random() * 1.0;             // 低 Q＝不刺、不共振
+    bp.frequency.value = 650 + Math.random() * 1300;    // 再往低挪：650–1950Hz，遠離「炸」的中高頻
+    bp.Q.value = 0.4 + Math.random() * 0.6;             // 更低 Q＝更柔、更鈍
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(amp * (0.5 + Math.random() * 0.6), now + 0.008);   // 軟起音＝無「啪」
+    g.gain.linearRampToValueAtTime(amp * (0.5 + Math.random() * 0.6), now + 0.012);   // 起音更軟
     g.gain.exponentialRampToValueAtTime(0.0003, now + dur);
     src.connect(bp); bp.connect(g); g.connect(this._slideOut);
     const off = Math.random() * (0.96 - dur);
@@ -1264,10 +1266,10 @@ const Sound = {
     const now = this.ctx.currentTime;
     let dt = now - this._lastGrainT; this._lastGrainT = now;
     if (dt < 0 || dt > 0.1) dt = 0.016;
-    const rate = Math.min(150, activity * 1.4);         // 每秒沙粒數（密度），飽和上限 150
+    const rate = Math.min(95, activity * 1.0);          // 降密度＝更鬆（一粒粒，不連續滋滋）
     this._grainAcc += rate * dt;
     let n = 0;
-    while (this._grainAcc >= 1 && n < 10) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.014); n++; }
+    while (this._grainAcc >= 1 && n < 8) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.018); n++; }
   },
   slideOff() { this._grainAcc = 0; this._lastGrainT = this.ctx ? this.ctx.currentTime : 0; },  // 停止灑粒，殘餘沙粒自然收尾
   ding() {                                    // 完成：柔和三音
