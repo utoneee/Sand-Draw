@@ -106,8 +106,8 @@
   }
   #stage > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
-  .rail { width: 48px; display: flex; flex-direction: column; align-items: center; }
-  .rail #colorRow { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .rail { width: 84px; display: flex; flex-direction: column; align-items: center; }
+  .rail #colorRow { display: grid; grid-template-columns: repeat(2, 34px); gap: 8px; justify-content: center; }
   .rail .tools { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
   .swatch {
     width: 34px; height: 34px; border-radius: 50%; cursor: pointer; flex: 0 0 auto;
@@ -336,7 +336,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/17 20:02</span>
+      <span class="ovUpd" id="ovUpd2">更新 06/17 20:34</span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -392,7 +392,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/17 20:02</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/17 20:34</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -483,7 +483,12 @@ const OUTLINE_COLOR = '#3a332b';   // 黑框（輪廓）填色用的墨沙顏色
 const OUTLINE_LW = 11;             // 黑框粗細
 
 // 低彩度大地色療癒盤：墨 / 米 / 陶 / 苔 / 霧 / 赭 / 藕 / 褐
-const SAND_COLORS = ['#000000', '#ffffff', '#be0009', '#619a22', '#0890be', '#ff9e0c', '#ff5179', '#4c5837'];
+const SAND_COLORS = [
+  // 鮮明組（你調的）+ 同色系變體
+  '#000000', '#ffffff', '#88989f', '#be0009', '#ff5179', '#ff9e0c', '#f2cf3e', '#619a22',
+  // 墨綠 / 藍 + 大地組（接近原本的療癒色，測試後可刪）
+  '#4c5837', '#0890be', '#b5876a', '#c9a86b', '#8a6f57', '#ece3d4', '#9aa384', '#b39a93',
+];
 
 // 共用輪廓路徑：本體填色與黑框共用同一條線，邊緣才會貼合
 function appleSilhouette(c) {
