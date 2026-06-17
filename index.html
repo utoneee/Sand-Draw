@@ -336,7 +336,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/17 19:10</span>
+      <span class="ovUpd" id="ovUpd2">更新 06/17 19:41</span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -392,7 +392,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/17 19:10</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/17 19:41</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -445,7 +445,7 @@ const W = 480, H = 480;
 const MAX_PARTICLES = 950;       // 上限提高，容納更大坨的沙
 const SCOOP_AMOUNT = 480;        // 單次倒沙量（一次倒多一點）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
-const STICK_CHANCE = 0.3;        // 黏贴機率（越高＝沙黏得越多、填得越滿）
+const STICK_CHANCE = 0.55;       // 黏贴機率（越高＝沙黏得越快、剩沙少→不易混色溢出）
 const ACCEL = 1.1;               // 重力加速係數（提高＝沙落得更乾脆，不慢飄）
 const DAMP = 0.8;                // 阻尼（低＝摩擦大、會停下不飄）
 const MAX_SPEED = 7.5;
@@ -483,7 +483,7 @@ const OUTLINE_COLOR = '#3a332b';   // 黑框（輪廓）填色用的墨沙顏色
 const OUTLINE_LW = 11;             // 黑框粗細
 
 // 低彩度大地色療癒盤：墨 / 米 / 陶 / 苔 / 霧 / 赭 / 藕 / 褐
-const SAND_COLORS = ['#3a332b', '#ece3d4', '#b5876a', '#9aa384', '#88989f', '#c9a86b', '#b39a93', '#8a6f57'];
+const SAND_COLORS = ['#000000', '#ffffff', '#be0009', '#619a22', '#0890be', '#ff9e0c', '#ff5179', '#4c5837'];
 
 // 共用輪廓路徑：本體填色與黑框共用同一條線，邊緣才會貼合
 function appleSilhouette(c) {
@@ -517,6 +517,8 @@ const _disc = (x, y, r) => (c) => { c.beginPath(); c.arc(x, y, r, 0, 7); };
 const _ell = (x, y, rx, ry, rot) => (c) => { c.beginPath(); c.ellipse(x, y, rx, ry, rot || 0, 0, 7); };
 const _star = (x, y, s) => (c) => { c.beginPath(); for (let i = 0; i < 8; i++) { const a = -Math.PI/2 + i*Math.PI/4, rr = i%2 ? s*0.4 : s; const px = x+Math.cos(a)*rr, py = y+Math.sin(a)*rr; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.closePath(); };
 const _poly = (pts) => (c) => { c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); };
+// 多顆星畫成同一條路徑 → 同一個區塊（分散小物件一起撕開）
+const _stars = (list) => (c) => { c.beginPath(); for (const [x, y, s] of list) { for (let i = 0; i < 8; i++) { const a = -Math.PI/2 + i*Math.PI/4, rr = i%2 ? s*0.4 : s; const px = x+Math.cos(a)*rr, py = y+Math.sin(a)*rr; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.closePath(); } };
 const _wave = (topY, amp, ph) => (c) => { c.beginPath(); c.moveTo(0, 430); c.lineTo(0, topY); for (let x = 0; x <= 480; x += 12) { c.lineTo(x, topY + Math.sin(x*0.0185 + ph)*amp); } c.lineTo(480, 430); c.closePath(); };
 
 // SVG 向量路徑 → 區塊。在 Illustrator / Figma / Inkscape 畫好匯出，把每段 path 的 d 字串貼進來。
@@ -558,10 +560,7 @@ const PATTERNS = {
     { color:'#8a6f57', shape:_wave(340,16,5.2) },
   ]},
   moon: { name:'月相', en:'MOON', tag:'夜空', regions:[
-    { color:'#c9a86b', shape:_star(384,118,16) },
-    { color:'#c9a86b', shape:_star(108,150,12) },
-    { color:'#c9a86b', shape:_star(96,332,11) },
-    { color:'#c9a86b', shape:_star(372,344,14) },
+    { color:'#c9a86b', shape:_stars([[384,118,16],[108,150,12],[96,332,11],[372,344,14]]) },   // 四星同一張貼紙，一起撕
     { color:'#ece3d4', shape:_disc(236,210,118) },
     { color:'#b39a93', shape:_disc(205,178,24) },
     { color:'#b39a93', shape:_disc(280,236,17) },
@@ -1243,21 +1242,21 @@ const Sound = {
     this._slideOut.connect(this.ctx.destination);
     this._grainAcc = 0; this._lastGrainT = this.ctx.currentTime;
   },
-  _grain(now, amp) {                          // 一顆極短沙粒（隨機頻率/音量/長度）→ 疊起來＝沙的顆粒感
-    const dur = 0.013 + Math.random() * 0.03;
+  _grain(now, amp) {                          // 一顆柔沙粒：較長、軟起音、中頻 → 密疊成綿密靜謐的沙聲（不爆裂）
+    const dur = 0.04 + Math.random() * 0.08;            // 40–120ms，較長＝平滑、不像爆米花
     const src = this.ctx.createBufferSource(); src.buffer = this._noise;
     const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass';
-    bp.frequency.value = 2200 + Math.random() * 4500;   // 每顆音色不同＝不死板
-    bp.Q.value = 1.4 + Math.random() * 2.6;
+    bp.frequency.value = 900 + Math.random() * 1900;    // 中頻：避開高頻的「炸」與低頻的「紙箱」
+    bp.Q.value = 0.5 + Math.random() * 1.0;             // 低 Q＝不刺、不共振
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(amp * (0.45 + Math.random() * 0.7), now + 0.0015);
-    g.gain.exponentialRampToValueAtTime(0.0004, now + dur);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(amp * (0.5 + Math.random() * 0.6), now + 0.008);   // 軟起音＝無「啪」
+    g.gain.exponentialRampToValueAtTime(0.0003, now + dur);
     src.connect(bp); bp.connect(g); g.connect(this._slideOut);
-    const off = Math.random() * (0.96 - dur);          // 從白噪緩衝隨機切一小段
+    const off = Math.random() * (0.96 - dur);
     src.start(now, Math.max(0, off), dur + 0.02);
   },
-  // 每幀依「移動中沙量」灑沙粒：沙多＝密、沙少＝稀疏滴答、靜止＝自然收尾（不硬切）
+  // 每幀依「移動中沙量」灑沙粒：高密度+低音量＝綿密；沙少＝稀疏；靜止＝自然收尾（不硬切）
   slideTick(activity) {
     if (this.muted || !this.ctx) return;
     if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -1265,14 +1264,15 @@ const Sound = {
     const now = this.ctx.currentTime;
     let dt = now - this._lastGrainT; this._lastGrainT = now;
     if (dt < 0 || dt > 0.1) dt = 0.016;
-    const rate = Math.min(200, activity * 1.7);         // 每秒沙粒數 ∝ 沙動程度（飽和上限 200）
+    const rate = Math.min(150, activity * 1.4);         // 每秒沙粒數（密度），飽和上限 150
     this._grainAcc += rate * dt;
     let n = 0;
-    while (this._grainAcc >= 1 && n < 9) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.03); n++; }
+    while (this._grainAcc >= 1 && n < 10) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.014); n++; }
   },
   slideOff() { this._grainAcc = 0; this._lastGrainT = this.ctx ? this.ctx.currentTime : 0; },  // 停止灑粒，殘餘沙粒自然收尾
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
     [523.25, 659.25, 783.99].forEach((f, i) => {
       const t = this.ctx.currentTime + i * 0.16;
       const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
@@ -1673,8 +1673,8 @@ const progressBar = document.getElementById('progressBar');
 function loop() {
   const g = input.gravity();
   particles.step(g.x, g.y, layers, stuckCtx);
-  // 滑沙聲（顆粒合成）：依「實際移動的沙量」灑沙粒 → 沙多＝密、沙少＝稀疏滴答、匯聚靜止＝自然收尾
-  if (layers) {
+  // 滑沙聲（顆粒合成）：依「實際移動的沙量」灑沙粒；回畫廊（picking）時不發聲
+  if (layers && !appEl.classList.contains('picking')) {
     let act = 0;
     for (const p of particles.list) { const sp = Math.abs(p.vx) + Math.abs(p.vy); if (sp > REST_SPEED) act += sp; }
     Sound.slideTick(act);
