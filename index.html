@@ -336,7 +336,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/18 14:19</span>
+      <span class="ovUpd" id="ovUpd2">更新 06/18 15:39</span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -392,7 +392,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/18 14:19</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/18 15:39</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -1258,7 +1258,7 @@ const Sound = {
     bp.Q.value = 0.4 + Math.random() * 0.6;             // 更低 Q＝更柔、更鈍
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(amp * (0.5 + Math.random() * 0.6), now + 0.012);   // 起音更軟
+    g.gain.linearRampToValueAtTime(amp * (0.5 + Math.random() * 0.5), now + 0.025);   // 起音再放軟＝單顆不「啵」
     g.gain.exponentialRampToValueAtTime(0.0003, now + dur);
     src.connect(bp); bp.connect(g); g.connect(this._slideOut);
     const off = Math.random() * (0.96 - dur);
