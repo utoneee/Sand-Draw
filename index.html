@@ -493,9 +493,17 @@ const OUTLINE_LW = 11;             // 黑框粗細
 
 // 沙色分組（側欄頂端「灰/暖/冷」分頁切換）。每組可再加色——用調色工具設計後給我 hex 即可。
 const SAND_GROUPS = {
-  '灰': ['#000000', '#ffffff', '#3e4140', '#566061', '#778288', '#9EAEAE'],
-  '暖': ['#d00b29', '#ee638f', '#fa9093', '#FF4F1A', '#FF9E0C', '#FDBF00', '#8a5a2b'],
-  '冷': ['#2b6b00', '#5aa834', '#005580', '#00a6b9', '#1a4fa0', '#6a5acd', '#9b59b6'],
+  // 現有色全部收成一盤
+  '原色': ['#000000', '#ffffff', '#3e4140', '#566061', '#778288', '#9EAEAE',
+           '#d00b29', '#ee638f', '#fa9093', '#FF4F1A', '#FF9E0C', '#FDBF00', '#8a5a2b',
+           '#2b6b00', '#5aa834', '#005580', '#00a6b9', '#1a4fa0', '#6a5acd', '#9b59b6'],
+  // 基礎總和色
+  '基礎': ['#FFFFFF', '#EDE7DD', '#3E4140', '#6B7477', '#98A4A4', '#B74B5B', '#D68C9C',
+           '#D97A5A', '#E8B19F', '#D9A34E', '#E2BB6A', '#5F8460', '#84A879', '#6D8CA0', '#7FB8C1'],
+  // 低彩度色
+  '低彩': ['#FFFFFF', '#EDE7DD', '#F3E2BF', '#E8B19F', '#D68C9C', '#D8CFE6', '#BFD5B8', '#B7C4CC',
+           '#98A4A4', '#E2BB6A', '#D9A34E', '#D97A5A', '#B74B5B', '#84A879', '#5F8460', '#7FB8C1',
+           '#6D8CA0', '#4F6F87', '#9B88B7', '#7A7A7A', '#6B7477', '#3E4140'],
 };
 
 // 共用輪廓路徑：本體填色與黑框共用同一條線，邊緣才會貼合
@@ -1257,7 +1265,7 @@ const Sound = {
   },
   _ensureSlideOut() {                         // 滑沙的輸出匯流（顆粒都接到這裡）
     if (this._slideOut || !this.ctx) return;
-    this._slideOut = this.ctx.createGain(); this._slideOut.gain.value = 1;
+    this._slideOut = this.ctx.createGain(); this._slideOut.gain.value = 0.2;   // 細微沙沙＝隱約聽得到但不吵
     this._slideOut.connect(this.ctx.destination);
     this._grainAcc = 0; this._lastGrainT = this.ctx.currentTime;
     // 方案A 底噪：一條持續的低通沙沙聲，填滿顆粒間的空隙 → 去掉「一顆顆啵」的斷裂感
@@ -1291,13 +1299,13 @@ const Sound = {
     const now = this.ctx.currentTime;
     let dt = now - this._lastGrainT; this._lastGrainT = now;
     if (dt < 0 || dt > 0.1) dt = 0.016;
-    const rate = Math.min(68, activity * 0.8);          // 再降密度＝更一粒粒、少連續嘶聲
+    const rate = Math.min(40, activity * 0.6);          // 再降密度＝更安靜、少連續嘶聲
     this._grainAcc += rate * dt;
     let n = 0;
-    while (this._grainAcc >= 1 && n < 6) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.013); n++; }  // 顆粒音量降低＝彈跳感更弱
+    while (this._grainAcc >= 1 && n < 6) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.009); n++; }  // 顆粒音量再降低＝彈跳感更弱
     // 方案A：底噪音量隨沙量平滑跟隨（顆粒調弱後，底噪稍提一點補活力）；ramp 避免爆音
     if (this._bedGain) {
-      const target = Math.min(1, rate / 68) * 0.014;   // 上限 ~0.014，仍低於顆粒尖峰
+      const target = Math.min(1, rate / 40) * 0.010;   // 上限 ~0.010，仍低於顆粒尖峰
       this._bedGain.gain.setTargetAtTime(target, now, 0.05);
     }
   },
