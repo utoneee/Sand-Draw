@@ -493,17 +493,16 @@ const OUTLINE_LW = 11;             // 黑框粗細
 
 // 沙色分組（側欄頂端「A/B/C」分頁切換）。每組可再加色——用調色工具設計後給我 hex 即可。
 const SAND_GROUPS = {
-  // A：原色（現有色全部收成一盤）
-  'A': ['#000000', '#ffffff', '#3e4140', '#566061', '#778288', '#9EAEAE',
-        '#d00b29', '#ee638f', '#FF4F1A', '#fa9093', '#FF9E0C', '#FDBF00', '#8a5a2b',
-        '#2b6b00', '#5aa834', '#005580', '#00a6b9', '#1a4fa0', '#6a5acd', '#9b59b6'],
-  // B：基礎
-  'B': ['#FFFFFF', '#98A4A4', '#EDE7DD', '#6B7477', '#7A7A7A', '#3E4140', '#F3E2BF', '#BFD5B8',
-        '#E2BB6A', '#84A879', '#D9A34E', '#5F8460', '#E8B19F', '#B7C4CC', '#D97A5A', '#7FB8C1',
-        '#D68C9C', '#6D8CA0', '#B74B5B', '#4F6F87', '#a89cb8', '#9B88B7'],
-  // C：低彩
-  'C': ['#D9E3E6', '#AFC8E8', '#C7D8CF', '#9CCFD8', '#A6C48A', '#8EA592', '#D7B089', '#B08B6C',
-        '#C9976B', '#A89CB8', '#C7B4D9', '#D8A2A9', '#A89F95', '#C8C1B7', '#524F4D', '#2A2A2A'],
+  // A：高彩萬用 + 最黑最白
+  'A': ['#FFFFFF', '#000000', '#d00b29', '#ee638f', '#FF4F1A', '#fa9093', '#FF9E0C', '#FDBF00',
+        '#5aa834', '#2b6b00', '#00a6b9', '#005580', '#9b59b6', '#6a5acd', '#8a5a2b'],
+  // B：灰色階 + 主色（兩欄交錯排序）
+  'B': ['#EDE7DD', '#C8C1B7', '#F3E2BF', '#A89F95', '#DCB663', '#98A4A4', '#D9A34E', '#6B7477',
+        '#E8B19F', '#3E4140', '#D08068', '#2A2A2A', '#D68C9C', '#84A879', '#B35C68', '#5F8460',
+        '#6D8CA0', '#4F6F87'],
+  // C：低彩搭配（含紫調，兩欄交錯排序）
+  'C': ['#D9E3E6', '#C7D8CF', '#AFC8E8', '#9CCFD8', '#C7B4D9', '#A89CB8',
+        '#D8A2A9', '#D7B089', '#C9976B', '#B08B6C', '#A6C48A', '#8EA592'],
 };
 
 // 共用輪廓路徑：本體填色與黑框共用同一條線，邊緣才會貼合
@@ -1006,6 +1005,19 @@ class ParticleSystem {
       });
     }
   }
+  scoopAt(color, n, cx, cy) {                  // 桌面測試：在指定座標撒沙（Shift+拖曳畫沙用）
+    for (let i = 0; i < n && this.list.length < MAX_PARTICLES; i++) {
+      const a = Math.random() * 7, rr = Math.random() * 10;
+      this.list.push({
+        x: cx + Math.cos(a) * rr,
+        y: cy + Math.sin(a) * rr,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        r: (3 + Math.random() * 2) * SAND_SIZE,
+        c: color,
+      });
+    }
+  }
   step(gx, gy, layers, stuckCtx) {
     const ax = gx * ACCEL, ay = (gy + BASE_GRAVITY) * ACCEL;
     // 傾斜／拖曳改變重力方向 → 喚醒整堆，讓沙重新流動
@@ -1434,6 +1446,15 @@ let _pd = null, _dragged = false;
 main.addEventListener('pointerdown', e => { _pd = { x: e.clientX, y: e.clientY }; _dragged = false; });
 main.addEventListener('pointermove', e => {
   if (!_pd) return;
+  // 桌面測試：按住 Shift 拖曳＝直接在游標處畫沙（不傾斜）
+  if (e.shiftKey) {
+    _dragged = true; input.manual = null;
+    const rect = stage.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width * W;
+    const y = (e.clientY - rect.top) / rect.height * H;
+    if (x >= 0 && y >= 0 && x < W && y < H) particles.scoopAt(selColor, 6, x, y);
+    return;
+  }
   const dx = e.clientX - _pd.x, dy = e.clientY - _pd.y;
   if (!_dragged && Math.hypot(dx, dy) < 7) return;
   _dragged = true;
