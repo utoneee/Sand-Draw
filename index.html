@@ -336,7 +336,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/17 20:34</span>
+      <span class="ovUpd" id="ovUpd2">更新 06/18 14:19</span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -392,7 +392,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/17 20:34</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/18 14:19</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -484,10 +484,8 @@ const OUTLINE_LW = 11;             // 黑框粗細
 
 // 低彩度大地色療癒盤：墨 / 米 / 陶 / 苔 / 霧 / 赭 / 藕 / 褐
 const SAND_COLORS = [
-  // 鮮明組（你調的）+ 同色系變體
-  '#000000', '#ffffff', '#88989f', '#be0009', '#ff5179', '#ff9e0c', '#f2cf3e', '#619a22',
-  // 墨綠 / 藍 + 大地組（接近原本的療癒色，測試後可刪）
-  '#4c5837', '#0890be', '#b5876a', '#c9a86b', '#8a6f57', '#ece3d4', '#9aa384', '#b39a93',
+  '#000000', '#ffffff', '#3e4140', '#566061', '#778288', '#9EAEAE', '#d00b29', '#ee638f',
+  '#FF4F1A', '#fa9093', '#FF9E0C', '#FDBF00', '#2b6b00', '#5aa834', '#005580', '#00a6b9',
 ];
 
 // 共用輪廓路徑：本體填色與黑框共用同一條線，邊緣才會貼合
@@ -832,8 +830,11 @@ function _drawOneGrain(ctx, x, y, r, g, sd, shape){
   grd.addColorStop(0, rgbStr(mix(jb,255,0.24))); grd.addColorStop(0.55, rgbStr(jb)); grd.addColorStop(1, rgbStr(mix(jb,0,edge)));
   ctx.fillStyle = grd; _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.fill();
   // 反差細邊：只有近白沙(lum>195)才描深邊解決淺底看不見；其餘大地色一律描淺邊，避免中性色被壓濁變灰
-  if (lum > 195) {                                  // 近白／淺米沙：淺底需要深邊才讀得出
-    ctx.globalAlpha = 0.4; ctx.lineWidth = Math.max(0.8, r*0.16); ctx.strokeStyle = rgbStr(mix(g.base, 0, 0.4));
+  if (lum > 205) {                                  // 近白沙：極淡細邊，不再灰髒（仍保留一絲輪廓）
+    ctx.globalAlpha = 0.24; ctx.lineWidth = Math.max(0.6, r*0.1); ctx.strokeStyle = rgbStr(mix(g.base, 0, 0.22));
+    _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.stroke(); ctx.globalAlpha = 1;
+  } else if (lum > 168) {                            // 淺色（淺米/淺灰）：中等深邊，淺底也讀得出
+    ctx.globalAlpha = 0.36; ctx.lineWidth = Math.max(0.7, r*0.14); ctx.strokeStyle = rgbStr(mix(g.base, 0, 0.34));
     _traceGrain(ctx, x, y, r*0.92, rot, sd, shape); ctx.stroke(); ctx.globalAlpha = 1;
   } else {                                          // 其餘色：淡淺邊提輪廓，不弄濁顏色
     ctx.globalAlpha = 0.32; ctx.lineWidth = Math.max(0.7, r*0.14); ctx.strokeStyle = rgbStr(mix(g.base, 255, 0.5));
@@ -1253,7 +1254,7 @@ const Sound = {
     const dur = 0.06 + Math.random() * 0.10;            // 60–160ms，更長＝更平滑
     const src = this.ctx.createBufferSource(); src.buffer = this._noise;
     const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass';
-    bp.frequency.value = 650 + Math.random() * 1300;    // 再往低挪：650–1950Hz，遠離「炸」的中高頻
+    bp.frequency.value = 600 + Math.random() * 1100;    // 600–1700Hz，再砍高頻尖端＝少嘶
     bp.Q.value = 0.4 + Math.random() * 0.6;             // 更低 Q＝更柔、更鈍
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, now);
@@ -1271,10 +1272,10 @@ const Sound = {
     const now = this.ctx.currentTime;
     let dt = now - this._lastGrainT; this._lastGrainT = now;
     if (dt < 0 || dt > 0.1) dt = 0.016;
-    const rate = Math.min(95, activity * 1.0);          // 降密度＝更鬆（一粒粒，不連續滋滋）
+    const rate = Math.min(68, activity * 0.8);          // 再降密度＝更一粒粒、少連續嘶聲
     this._grainAcc += rate * dt;
     let n = 0;
-    while (this._grainAcc >= 1 && n < 8) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.018); n++; }
+    while (this._grainAcc >= 1 && n < 6) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.022); n++; }
   },
   slideOff() { this._grainAcc = 0; this._lastGrainT = this.ctx ? this.ctx.currentTime : 0; },  // 停止灑粒，殘餘沙粒自然收尾
   ding() {                                    // 完成：柔和三音
