@@ -108,6 +108,11 @@
 
   .rail { width: 84px; display: flex; flex-direction: column; align-items: center; }
   .rail #colorRow { display: grid; grid-template-columns: repeat(2, 34px); gap: 8px; justify-content: center; }
+  .rail #colorTabs { display: flex; gap: 5px; margin-bottom: 9px; justify-content: center; }
+  .grpTab { width: 24px; height: 24px; border-radius: 7px; padding: 0; font-size: 12px; font-weight: 600;
+    background: var(--btnBg); color: var(--muted); border: 1px solid var(--btnBd); cursor: pointer; transition: transform .08s; }
+  .grpTab:active { transform: scale(.9); }
+  .grpTab.on { color: var(--onFrame); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .rail .tools { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
   .swatch {
     width: 34px; height: 34px; border-radius: 50%; cursor: pointer; flex: 0 0 auto;
@@ -336,7 +341,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/18 15:39</span>
+      <span class="ovUpd" id="ovUpd2">更新 06/18 15:50</span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -375,6 +380,7 @@
       </div>
 
       <div class="rail gameUi">
+        <div id="colorTabs"></div>
         <div id="colorRow"></div>
         <div class="tools">
           <button id="dumpBtn" class="iconBtn" title="倒掉散沙">↺</button>
@@ -392,7 +398,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/18 15:39</span>
+    <span class="ovUpd" id="ovUpd">更新 2026/06/18 15:50</span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -443,7 +449,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 950;       // 上限提高，容納更大坨的沙
-const SCOOP_AMOUNT = 480;        // 單次倒沙量（一次倒多一點）
+const SCOOP_AMOUNT = 170;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
 const STICK_CHANCE = 0.55;       // 黏贴機率（越高＝沙黏得越快、剩沙少→不易混色溢出）
 const ACCEL = 1.1;               // 重力加速係數（提高＝沙落得更乾脆，不慢飄）
@@ -482,11 +488,12 @@ let TH = THEMES.dark;
 const OUTLINE_COLOR = '#3a332b';   // 黑框（輪廓）填色用的墨沙顏色（暖黑）
 const OUTLINE_LW = 11;             // 黑框粗細
 
-// 低彩度大地色療癒盤：墨 / 米 / 陶 / 苔 / 霧 / 赭 / 藕 / 褐
-const SAND_COLORS = [
-  '#000000', '#ffffff', '#3e4140', '#566061', '#778288', '#9EAEAE', '#d00b29', '#ee638f',
-  '#FF4F1A', '#fa9093', '#FF9E0C', '#FDBF00', '#2b6b00', '#5aa834', '#005580', '#00a6b9',
-];
+// 沙色分組（側欄頂端「灰/暖/冷」分頁切換）。每組可再加色——用調色工具設計後給我 hex 即可。
+const SAND_GROUPS = {
+  '灰': ['#000000', '#ffffff', '#3e4140', '#566061', '#778288', '#9EAEAE'],
+  '暖': ['#d00b29', '#ee638f', '#fa9093', '#FF4F1A', '#FF9E0C', '#FDBF00', '#8a5a2b'],
+  '冷': ['#2b6b00', '#5aa834', '#005580', '#00a6b9', '#1a4fa0', '#6a5acd', '#9b59b6'],
+};
 
 // 共用輪廓路徑：本體填色與黑框共用同一條線，邊緣才會貼合
 function appleSilhouette(c) {
@@ -791,7 +798,7 @@ function grainShades(hex){
 // ── 多角細沙：每色預烘焙數張「顆粒團」貼圖，drawImage 取代逐顆描路徑 ──
 //   顆粒造型：'angular' = 多角不規則（預設）｜'faceted' = 方菱小面（可在開始畫面切換）
 let GRAIN_SHAPE = 'angular';      // 固定多角（方菱外觀差異不大，已移除切換）
-const SAND_SIZE = 0.6;            // 沙粒大小（固定；要改大小直接調此值）
+const SAND_SIZE = 0.5;            // 沙粒大小（固定；要改大小直接調此值）
 const GRAIN_SCALE = 0.7;          // 顆粒相對大小（70%）：每團裝多顆更細的沙
 const RP = 7;                     // sprite 內顆粒基準半徑
 const SPRITE = 20;                // sprite 畫布尺寸（含陰影/高光邊距）
@@ -1414,18 +1421,36 @@ main.addEventListener('pointerleave', e => { if (_pd) { _pd = null; input.manual
 
 // 顏色盤
 const colorRow = document.getElementById('colorRow');
-SAND_COLORS.forEach((col, i) => {
-  const s = document.createElement('div');
-  s.className = 'swatch' + (i === 0 ? ' sel' : '');
-  s.style.background = col;
-  s.addEventListener('click', () => {
-    colorRow.querySelectorAll('.swatch').forEach(el => el.classList.remove('sel'));
-    s.classList.add('sel');
-    Sound.init(); Sound.pour();
-    particles.scoop(col, SCOOP_AMOUNT);
+const colorTabs = document.getElementById('colorTabs');
+let activeGroup = Object.keys(SAND_GROUPS)[0];
+let selColor = SAND_GROUPS[activeGroup][0];
+function buildSwatches() {
+  colorRow.innerHTML = '';
+  SAND_GROUPS[activeGroup].forEach(col => {
+    const s = document.createElement('div');
+    s.className = 'swatch' + (col === selColor ? ' sel' : '');
+    s.style.background = col;
+    s.addEventListener('click', () => {
+      colorRow.querySelectorAll('.swatch').forEach(el => el.classList.remove('sel'));
+      s.classList.add('sel'); selColor = col;
+      Sound.init(); Sound.pour();
+      particles.scoop(col, SCOOP_AMOUNT);
+    });
+    colorRow.appendChild(s);
   });
-  colorRow.appendChild(s);
+}
+Object.keys(SAND_GROUPS).forEach(g => {
+  const b = document.createElement('button');
+  b.className = 'grpTab' + (g === activeGroup ? ' on' : ''); b.textContent = g;
+  b.addEventListener('click', () => {
+    activeGroup = g;
+    colorTabs.querySelectorAll('.grpTab').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    buildSwatches();
+  });
+  colorTabs.appendChild(b);
 });
+buildSwatches();
 
 // ── 選圖：畫廊 + 單張聚焦 ──
 const winBanner = document.getElementById('winBanner');
