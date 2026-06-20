@@ -449,7 +449,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 950;       // 上限提高，容納更大坨的沙
-const SCOOP_AMOUNT = 170;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
+const SCOOP_AMOUNT = 220;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
 const STICK_CHANCE = 0.55;       // 黏贴機率（越高＝沙黏得越快、剩沙少→不易混色溢出）
 const ACCEL = 1.1;               // 重力加速係數（提高＝沙落得更乾脆，不慢飄）
@@ -798,7 +798,7 @@ function grainShades(hex){
 // ── 多角細沙：每色預烘焙數張「顆粒團」貼圖，drawImage 取代逐顆描路徑 ──
 //   顆粒造型：'angular' = 多角不規則（預設）｜'faceted' = 方菱小面（可在開始畫面切換）
 let GRAIN_SHAPE = 'angular';      // 固定多角（方菱外觀差異不大，已移除切換）
-const SAND_SIZE = 0.5;            // 沙粒大小（固定；要改大小直接調此值）
+const SAND_SIZE = 0.42;           // 沙粒大小（固定；要改大小直接調此值）
 const GRAIN_SCALE = 0.7;          // 顆粒相對大小（70%）：每團裝多顆更細的沙
 const RP = 7;                     // sprite 內顆粒基準半徑
 const SPRITE = 20;                // sprite 畫布尺寸（含陰影/高光邊距）
@@ -1225,6 +1225,7 @@ let currentKey = null;
 // ── 音效（Web Audio 即時合成，無外部檔案）──
 const Sound = {
   ctx: null, muted: false, _noise: null, _slideOut: null, _grainAcc: 0, _lastGrainT: 0,
+  _bedSrc: null, _bedGain: null,   // 方案A：顆粒層底下的連續底噪（黏合劑，極低音量）
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -1256,6 +1257,14 @@ const Sound = {
     this._slideOut = this.ctx.createGain(); this._slideOut.gain.value = 1;
     this._slideOut.connect(this.ctx.destination);
     this._grainAcc = 0; this._lastGrainT = this.ctx.currentTime;
+    // 方案A 底噪：一條持續的低通沙沙聲，填滿顆粒間的空隙 → 去掉「一顆顆啵」的斷裂感
+    const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 300; // 砍低頻轟鳴
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.4; // 鈍而柔，不嘶
+    const g = this.ctx.createGain(); g.gain.value = 0;   // 初始靜音，由 slideTick 依沙量推上去
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this._slideOut);
+    src.start();
+    this._bedSrc = src; this._bedGain = g;
   },
   _grain(now, amp) {                          // 一顆柔沙粒：更長、更軟起音、更低頻 → 鬆而柔，不再炸物感
     const dur = 0.06 + Math.random() * 0.10;            // 60–160ms，更長＝更平滑
@@ -1283,8 +1292,16 @@ const Sound = {
     this._grainAcc += rate * dt;
     let n = 0;
     while (this._grainAcc >= 1 && n < 6) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.022); n++; }
+    // 方案A：底噪音量隨沙量平滑跟隨（極小，只當黏合劑）；ramp 避免爆音
+    if (this._bedGain) {
+      const target = Math.min(1, rate / 68) * 0.009;   // 上限 ~0.009，遠低於顆粒層
+      this._bedGain.gain.setTargetAtTime(target, now, 0.05);
+    }
   },
-  slideOff() { this._grainAcc = 0; this._lastGrainT = this.ctx ? this.ctx.currentTime : 0; },  // 停止灑粒，殘餘沙粒自然收尾
+  slideOff() {                                          // 停止灑粒，殘餘沙粒自然收尾
+    this._grainAcc = 0; this._lastGrainT = this.ctx ? this.ctx.currentTime : 0;
+    if (this._bedGain && this.ctx) this._bedGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08);  // 底噪柔收
+  },
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
     if (this.ctx.state === 'suspended') this.ctx.resume();
