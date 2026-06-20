@@ -52,7 +52,8 @@
     --bd-strong: rgba(80,72,60,.4);
   }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }  /* 連點不選字、不跳複製/剪下/貼上選單 */
   html, body {
     height: 100%;
     background: var(--bodyBg);
@@ -341,7 +342,7 @@
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
       <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
       <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2">更新 06/18 15:50</span>
+      <span class="ovUpd" id="ovUpd2"></span>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -398,7 +399,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
-    <span class="ovUpd" id="ovUpd">更新 2026/06/18 15:50</span>
+    <span class="ovUpd" id="ovUpd"></span>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -449,6 +450,8 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 950;       // 上限提高，容納更大坨的沙
+const BUILD = '2026/06/20 17:25';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 220;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
 const STICK_CHANCE = 0.55;       // 黏贴機率（越高＝沙黏得越快、剩沙少→不易混色溢出）
@@ -1274,7 +1277,7 @@ const Sound = {
     bp.Q.value = 0.4 + Math.random() * 0.6;             // 更低 Q＝更柔、更鈍
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(amp * (0.5 + Math.random() * 0.5), now + 0.025);   // 起音再放軟＝單顆不「啵」
+    g.gain.linearRampToValueAtTime(amp * (0.5 + Math.random() * 0.5), now + 0.045);   // 起音再放軟（45ms）＝單顆不「啵」
     g.gain.exponentialRampToValueAtTime(0.0003, now + dur);
     src.connect(bp); bp.connect(g); g.connect(this._slideOut);
     const off = Math.random() * (0.96 - dur);
@@ -1291,10 +1294,10 @@ const Sound = {
     const rate = Math.min(68, activity * 0.8);          // 再降密度＝更一粒粒、少連續嘶聲
     this._grainAcc += rate * dt;
     let n = 0;
-    while (this._grainAcc >= 1 && n < 6) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.022); n++; }
-    // 方案A：底噪音量隨沙量平滑跟隨（極小，只當黏合劑）；ramp 避免爆音
+    while (this._grainAcc >= 1 && n < 6) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.013); n++; }  // 顆粒音量降低＝彈跳感更弱
+    // 方案A：底噪音量隨沙量平滑跟隨（顆粒調弱後，底噪稍提一點補活力）；ramp 避免爆音
     if (this._bedGain) {
-      const target = Math.min(1, rate / 68) * 0.009;   // 上限 ~0.009，遠低於顆粒層
+      const target = Math.min(1, rate / 68) * 0.014;   // 上限 ~0.014，仍低於顆粒尖峰
       this._bedGain.gain.setTargetAtTime(target, now, 0.05);
     }
   },
