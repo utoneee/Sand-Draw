@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="沙畫">
+<link rel="manifest" href="manifest.json">
 <title>沙畫遊戲 · Peel. Pour. Paint.</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -403,6 +405,7 @@
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
     <span class="ovUpd" id="ovUpd"></span>
+    <button id="updateBtn" class="iconBtn" title="檢查更新">↻</button>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
   </div>
@@ -453,7 +456,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/24 11:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/24 12:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1850,48 +1853,55 @@ document.getElementById('dumpBtn').addEventListener('click', () => { particles.c
   });
 })();
 
-// 方向鎖定
+// 方向鎖定（PWA 模式用 screen.orientation.lock()，網頁模式無效但按鈕仍顯示）
 (() => {
   const lockBtn = document.getElementById('lockBtn');
   let locked = true;
-  let lockedAngle = (screen.orientation ? screen.orientation.angle : window.orientation) || 0;
 
-  function getAngle() {
-    const a = screen.orientation ? screen.orientation.angle : (window.orientation || 0);
-    return ((a % 360) + 360) % 360;  // 正規化：iOS -90 -> 270
+  function getType() {
+    if (screen.orientation) return screen.orientation.type; // "portrait-primary" etc.
+    const a = ((window.orientation || 0) % 360 + 360) % 360;
+    return (a === 90 || a === 270) ? 'landscape-primary' : 'portrait-primary';
   }
-  function isLandscape(a) { return a === 90 || a === 270; }
-  function applyLock() {
-    const app = document.getElementById('app');
-    if (!locked) { app.style.transform = ''; return; }
-    const cur = getAngle();
-    // 同為直向或同為橫向 → 不旋轉（允許 0↔180、90↔270 自由翻轉）
-    if (isLandscape(cur) === isLandscape(lockedAngle)) {
-      app.style.transform = '';
+  async function applyLock() {
+    if (!screen.orientation || !screen.orientation.lock) return;
+    if (locked) {
+      const t = getType();
+      const family = t.startsWith('portrait') ? 'portrait' : 'landscape';
+      try { await screen.orientation.lock(family); } catch(e) {}
     } else {
-      // 跨直/橫 → 補一個 90deg 抵消
-      const r = ((cur - lockedAngle) % 360 + 360) % 360;
-      app.style.transform = r < 180 ? 'rotate(-90deg)' : 'rotate(90deg)';
+      screen.orientation.unlock();
     }
   }
   function updateBtn() {
     lockBtn.textContent = locked ? '🔒' : '🔓';
     lockBtn.classList.toggle('hot', locked);
   }
-  lockBtn.addEventListener('click', () => {
-    if (!locked) {
-      // 解鎖 → 按下重新鎖定當前方向
-      lockedAngle = getAngle();
-      locked = true;
-    } else {
-      locked = false;
-    }
-    applyLock();
+  lockBtn.addEventListener('click', async () => {
+    locked = !locked;
+    await applyLock();
     updateBtn();
   });
-  window.addEventListener('orientationchange', () => setTimeout(applyLock, 100));
+  // 進入遊戲時嘗試鎖定
+  applyLock();
   updateBtn();
 })();
+
+// Service Worker 註冊 + 更新按鈕
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+document.getElementById('updateBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('updateBtn');
+  btn.textContent = '…';
+  try {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    for (const r of regs) await r.unregister();
+    const keys = await caches.keys();
+    for (const k of keys) await caches.delete(k);
+  } catch(e) {}
+  location.reload(true);
+});
 document.getElementById('changeBtn').addEventListener('click', () => {
   // 已完成（已存起來）或沒進度 → 直接換；有未存的進度才確認
   if (layers && layers.covered() > 0 && !won && !confirm('要換圖案嗎？目前的作品會清掉。')) return;
