@@ -75,7 +75,7 @@
     position: relative;
   }
   .topbar { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
-  .topbar .title { font-family: var(--font-round); font-size: 16px; font-weight: 600; letter-spacing: 3px; margin-left: auto; }
+  .topbar .tbRight { margin-left: auto; display: flex; gap: 6px; }
   .pillBtn {
     font-family: inherit; font-size: 12px; font-weight: 500; white-space: nowrap;
     padding: 7px 13px; border-radius: 20px; background: var(--btnBg); color: var(--onFrame);
@@ -114,7 +114,8 @@
     background: var(--btnBg); color: var(--muted); border: 1px solid var(--btnBd); cursor: pointer; transition: transform .08s; }
   .grpTab:active { transform: scale(.9); }
   .grpTab.on { color: var(--onFrame); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .rail .tools { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
+  .rail .tools { margin-top: auto; padding-top: 12px; width: 100%; }
+  .rail .tools #dumpBtn { width: 100%; height: 52px; font-size: 13px; font-family: var(--font-round); letter-spacing: 1px; border-radius: 7px; }
   .swatch {
     width: 34px; height: 34px; border-radius: 50%; cursor: pointer; flex: 0 0 auto;
     box-shadow: 0 2px 4px rgba(0,0,0,.28), inset 0 1px 2px rgba(255,255,255,.4), inset 0 -2px 3px rgba(0,0,0,.22);
@@ -340,9 +341,11 @@
   <div class="device">
     <div class="topbar">
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
-      <button id="gearBtn" class="gameUi iconBtn" title="工具">⚙</button>
-      <span class="title">沙畫</span>
-      <span class="ovUpd" id="ovUpd2"></span>
+      <div class="tbRight gameUi">
+        <button id="lockBtn" class="iconBtn" title="鎖定方向">🔒</button>
+        <button id="muteBtn" class="iconBtn" title="音效開關">🔊</button>
+        <button id="gearBtn" class="iconBtn" title="工具">⚙</button>
+      </div>
     </div>
     <div id="toolPanel" class="gameUi">
       <div class="tpHead">工具 <button id="tpClose" class="tpX" title="關閉">×</button></div>
@@ -384,8 +387,7 @@
         <div id="colorTabs"></div>
         <div id="colorRow"></div>
         <div class="tools">
-          <button id="dumpBtn" class="iconBtn" title="倒掉散沙">↺</button>
-          <button id="muteBtn" class="iconBtn" title="音效開關">🔊</button>
+          <button id="dumpBtn" class="iconBtn" title="倒掉散沙">↺ 清沙</button>
         </div>
       </div>
     </div>
@@ -450,7 +452,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/23 13:30';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/23 15:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1813,6 +1815,45 @@ document.getElementById('dumpBtn').addEventListener('click', () => { particles.c
     const m = Sound.toggle();
     muteBtn.textContent = m ? '🔇' : '🔊';
   });
+})();
+
+// 方向鎖定
+(() => {
+  const lockBtn = document.getElementById('lockBtn');
+  let locked = true;
+  let lockedAngle = (screen.orientation ? screen.orientation.angle : window.orientation) || 0;
+
+  function getAngle() {
+    return screen.orientation ? screen.orientation.angle : (window.orientation || 0);
+  }
+  function applyLock() {
+    if (!locked) { document.getElementById('app').style.transform = ''; return; }
+    const diff = getAngle() - lockedAngle;
+    const r = ((diff % 360) + 360) % 360;
+    if (r === 0) {
+      document.getElementById('app').style.transform = '';
+    } else {
+      // 反轉並補償尺寸差
+      document.getElementById('app').style.transform = `rotate(${-r}deg)`;
+    }
+  }
+  function updateBtn() {
+    lockBtn.textContent = locked ? '🔒' : '🔓';
+    lockBtn.classList.toggle('hot', locked);
+  }
+  lockBtn.addEventListener('click', () => {
+    if (!locked) {
+      // 解鎖 → 按下重新鎖定當前方向
+      lockedAngle = getAngle();
+      locked = true;
+    } else {
+      locked = false;
+    }
+    applyLock();
+    updateBtn();
+  });
+  window.addEventListener('orientationchange', () => setTimeout(applyLock, 100));
+  updateBtn();
 })();
 document.getElementById('changeBtn').addEventListener('click', () => {
   // 已完成（已存起來）或沒進度 → 直接換；有未存的進度才確認
