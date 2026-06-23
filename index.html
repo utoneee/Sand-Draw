@@ -450,7 +450,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/22 07:30';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/23 12:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1287,7 +1287,7 @@ let currentKey = null;
 
 // ── 音效（Web Audio 即時合成，無外部檔案）──
 const Sound = {
-  ctx: null, muted: false, _noise: null, _slideOut: null, _grainAcc: 0, _lastGrainT: 0,
+  ctx: null, muted: false, _noise: null, _slideOut: null,
   _bedSrc: null, _bedGain: null,   // 方案A：顆粒層底下的連續底噪（黏合劑，極低音量）
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
@@ -1315,55 +1315,30 @@ const Sound = {
     src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
     src.start(t); src.stop(t + 0.76);
   },
-  _ensureSlideOut() {                         // 滑沙的輸出匯流（顆粒都接到這裡）
+  _ensureSlideOut() {
     if (this._slideOut || !this.ctx) return;
-    this._slideOut = this.ctx.createGain(); this._slideOut.gain.value = 0.8;
+    this._slideOut = this.ctx.createGain(); this._slideOut.gain.value = 1.0;
     this._slideOut.connect(this.ctx.destination);
-    this._grainAcc = 0; this._lastGrainT = this.ctx.currentTime;
-    // 方案A 底噪：一條持續的低通沙沙聲，填滿顆粒間的空隙 → 去掉「一顆顆啵」的斷裂感
-    const src = this.ctx.createBufferSource(); src.buffer = this._noise; src.loop = true;
-    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 150;
-    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.Q.value = 0.3;
-    const g = this.ctx.createGain(); g.gain.value = 0;   // 初始靜音，由 slideTick 依沙量推上去
-    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this._slideOut);
-    src.start();
-    this._bedSrc = src; this._bedGain = g;
+    // 連續噪音床：HP+LP 塑形後接可調音量節點
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 800;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
+    this._bedGain = this.ctx.createGain(); this._bedGain.gain.value = 0;
+    const bedSrc = this.ctx.createBufferSource(); bedSrc.buffer = this._noise; bedSrc.loop = true;
+    bedSrc.connect(hp); hp.connect(lp); lp.connect(this._bedGain); this._bedGain.connect(this._slideOut);
+    bedSrc.start();
+    this._bedSrc = bedSrc;
   },
-  _grain(now, amp) {                          // 一顆柔沙粒：更長、更軟起音、更低頻 → 鬆而柔，不再炸物感
-    const dur = 0.10 + Math.random() * 0.14;            // 100–240ms，更長更平滑＝摩擦感
-    const src = this.ctx.createBufferSource(); src.buffer = this._noise;
-    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass';
-    bp.frequency.value = 250 + Math.random() * 950;     // 250–1200Hz，中頻摩擦感
-    bp.Q.value = 0.15 + Math.random() * 0.15;            // 低 Q＝寬頻帶，不共鳴，顆粒不「啵」
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(amp * (0.5 + Math.random() * 0.5), now + 0.07);    // 稍慢起音＝更滑順
-    g.gain.exponentialRampToValueAtTime(0.0003, now + dur);
-    src.connect(bp); bp.connect(g); g.connect(this._slideOut);
-    const off = Math.random() * (0.96 - dur);
-    src.start(now, Math.max(0, off), dur + 0.02);
-  },
-  // 每幀依「移動中沙量」灑沙粒：高密度+低音量＝綿密；沙少＝稀疏；靜止＝自然收尾（不硬切）
   slideTick(activity) {
     if (this.muted || !this.ctx) return;
     if (this.ctx.state === 'suspended') this.ctx.resume();
     this._ensureSlideOut();
     const now = this.ctx.currentTime;
-    let dt = now - this._lastGrainT; this._lastGrainT = now;
-    if (dt < 0 || dt > 0.1) dt = 0.016;
-    const rate = Math.min(120, activity * 4.0);          // 高密度讓顆粒重疊成連續摩擦感
-    this._grainAcc += rate * dt;
-    let n = 0;
-    while (this._grainAcc >= 1 && n < 12) { this._grainAcc -= 1; this._grain(now + Math.random() * dt, 0.011); n++; }
-    // 方案A：底噪音量隨沙量平滑跟隨（顆粒調弱後，底噪稍提一點補活力）；ramp 避免爆音
-    if (this._bedGain) {
-      const target = Math.min(1, rate / 40) * 0.05;
-      this._bedGain.gain.setTargetAtTime(target, now, 0.05);
-    }
+    // 音量跟著活躍度平滑升降，無離散 burst → 不會啪啪
+    const target = activity > 4 ? Math.min(0.05, activity / 480) : 0;
+    this._bedGain.gain.setTargetAtTime(target, now, 0.9);  // 慢淡入
   },
-  slideOff() {                                          // 停止灑粒，殘餘沙粒自然收尾
-    this._grainAcc = 0; this._lastGrainT = this.ctx ? this.ctx.currentTime : 0;
-    if (this._bedGain && this.ctx) this._bedGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08);  // 底噪柔收
+  slideOff() {
+    if (this._bedGain && this.ctx) this._bedGain.gain.setTargetAtTime(0, this.ctx.currentTime, 1.2);  // 長餘韻
   },
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
