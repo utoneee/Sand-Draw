@@ -341,6 +341,7 @@
   <div class="device">
     <div class="topbar">
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
+      <span class="ovUpd gameUi" id="ovUpd2" style="font-size:10px;opacity:.5;margin-left:4px;"></span>
       <div class="tbRight gameUi">
         <button id="lockBtn" class="iconBtn" title="鎖定方向">🔒</button>
         <button id="muteBtn" class="iconBtn" title="音效開關">🔊</button>
@@ -452,7 +453,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/23 17:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/24 10:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1845,7 +1846,8 @@ document.getElementById('dumpBtn').addEventListener('click', () => { particles.c
   let lockedAngle = (screen.orientation ? screen.orientation.angle : window.orientation) || 0;
 
   function getAngle() {
-    return screen.orientation ? screen.orientation.angle : (window.orientation || 0);
+    const a = screen.orientation ? screen.orientation.angle : (window.orientation || 0);
+    return ((a % 360) + 360) % 360;  // 正規化：iOS -90 -> 270
   }
   function isLandscape(a) { return a === 90 || a === 270; }
   function applyLock() {
