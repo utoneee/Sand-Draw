@@ -450,7 +450,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/22 04:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/22 04:30';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1869,14 +1869,17 @@ document.addEventListener('touchend', e => {
 document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
 
 // iOS Safari: aspect-ratio on flex children can compute height=0; force square explicitly
+const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function fitBoard() {
+  if (!_isIOS) return;
   const sw = document.querySelector('.sandwell');
   if (!sw || !sw.offsetWidth) return;
   sw.style.height = sw.offsetWidth + 'px';
 }
-requestAnimationFrame(fitBoard);
+setTimeout(fitBoard, 100);
 window.addEventListener('resize', fitBoard);
-window.addEventListener('orientationchange', () => setTimeout(fitBoard, 200));
+window.addEventListener('orientationchange', () => setTimeout(fitBoard, 300));
 
 })();
 </script>
