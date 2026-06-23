@@ -92,7 +92,7 @@
   /* 沙盤 + 側欄 */
   .playRow { display: flex; gap: 12px; align-items: stretch; }
   .sandwell {
-    position: relative; flex: 1; aspect-ratio: 1/1; align-self: flex-start;
+    position: relative; flex: 1; align-self: flex-start;
     border-radius: var(--wellRadius); padding: var(--rimPad); background: var(--wellRim);
     box-shadow: inset 0 2px 5px rgba(0,0,0,.22), inset 0 -1px 2px rgba(255,255,255,.22);
   }
@@ -101,7 +101,7 @@
     pointer-events: none; z-index: 4; box-shadow: inset 0 3px 7px -3px rgba(0,0,0,.28);
   }
   #stage {
-    position: relative; width: 100%; height: 100%;
+    position: relative; width: 100%; aspect-ratio: 1/1;
     border-radius: var(--stageRadius); overflow: hidden;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
   }
@@ -450,7 +450,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/22 04:30';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/22 05:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1868,16 +1868,18 @@ document.addEventListener('touchend', e => {
   document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
 document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
 
-// iOS Safari: aspect-ratio on flex children can compute height=0; force square explicitly
+// iOS Safari fallback: aspect-ratio on block may still fail on older versions
 const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function fitBoard() {
   if (!_isIOS) return;
-  const sw = document.querySelector('.sandwell');
-  if (!sw || !sw.offsetWidth) return;
-  sw.style.height = sw.offsetWidth + 'px';
+  const stageEl = document.getElementById('stage');
+  if (!stageEl) return;
+  const w = stageEl.clientWidth;
+  if (!w) return;
+  if (Math.abs(stageEl.clientHeight - w) > 2) stageEl.style.height = w + 'px';
 }
-setTimeout(fitBoard, 100);
+setTimeout(fitBoard, 150);
 window.addEventListener('resize', fitBoard);
 window.addEventListener('orientationchange', () => setTimeout(fitBoard, 300));
 
