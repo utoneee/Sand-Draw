@@ -450,7 +450,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/23 12:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/23 13:00';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1334,11 +1334,12 @@ const Sound = {
     this._ensureSlideOut();
     const now = this.ctx.currentTime;
     // 音量跟著活躍度平滑升降，無離散 burst → 不會啪啪
-    const target = activity > 4 ? Math.min(0.05, activity / 480) : 0;
-    this._bedGain.gain.setTargetAtTime(target, now, 0.9);  // 慢淡入
+    const target = activity > 4 ? Math.min(0.022, activity / 900) : 0;
+    const tc = target > 0 ? 1.6 : 0.12;
+    this._bedGain.gain.setTargetAtTime(target, now, tc);
   },
   slideOff() {
-    if (this._bedGain && this.ctx) this._bedGain.gain.setTargetAtTime(0, this.ctx.currentTime, 1.2);  // 長餘韻
+    if (this._bedGain && this.ctx) this._bedGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.12);
   },
   ding() {                                    // 完成：柔和三音
     if (this.muted || !this.ctx) return;
