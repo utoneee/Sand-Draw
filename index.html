@@ -69,17 +69,8 @@
     padding: env(safe-area-inset-top, 8px) 10px env(safe-area-inset-bottom, 8px);
   }
 
-  /* 旋轉提示：橫放(代表玩家沒開 iOS 旋轉鎖定)時蓋全螢幕提醒轉回直式。不轉畫面，零旋轉動畫。 */
-  #rotateHint {
-    position: fixed; inset: 0; z-index: 999; display: none;
-    flex-direction: column; align-items: center; justify-content: center; gap: 16px;
-    background: var(--bodyBg); color: var(--onFrame); text-align: center; padding: 24px;
-  }
-  #rotateHint.show { display: flex; }
-  #rotateHint .rhIcon { font-size: 52px; animation: rhSpin 2.4s ease-in-out infinite; }
-  #rotateHint .rhBig { font-family: var(--font-round); font-size: 19px; font-weight: 600; letter-spacing: .5px; }
-  #rotateHint .rhSmall { font-size: 13px; color: var(--muted); line-height: 1.7; max-width: 240px; }
-  @keyframes rhSpin { 0%,40% { transform: rotate(0); } 70%,100% { transform: rotate(-90deg); } }
+  /* 旋轉建議：靜態小字，提示直式體驗較佳（橫式也能玩，不強制） */
+  .rotTip { font-size: 11px; color: var(--muted); letter-spacing: .3px; white-space: nowrap; opacity: .85; }
 
   /* 機身外框 */
   .device {
@@ -351,16 +342,10 @@
 </style>
 </head>
 <body>
-<div id="rotateHint">
-  <div class="rhIcon">📱</div>
-  <div class="rhBig">請轉回直式</div>
-  <div class="rhSmall">這個遊戲適合直式遊玩<br>建議打開螢幕的「旋轉鎖定」</div>
-</div>
 <div id="app" class="picking">
   <div class="device">
     <div class="topbar">
       <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
-      <span class="ovUpd gameUi" id="ovUpd2" style="font-size:10px;opacity:.5;margin-left:4px;"></span>
       <div class="tbRight gameUi">
         <button id="muteBtn" class="iconBtn" title="音效開關">🔊</button>
         <button id="gearBtn" class="iconBtn" title="工具">⚙</button>
@@ -420,6 +405,7 @@
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
+    <span class="rotTip">📱 直式遊玩體驗較佳</span>
     <span class="ovUpd" id="ovUpd"></span>
     <button id="updateBtn" class="iconBtn" title="檢查更新">↻</button>
     <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
@@ -472,8 +458,8 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/25 00:40';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
-['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
+const BUILD = '2026/06/25 01:05';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+{ const el = document.getElementById('ovUpd'); if (el) el.textContent = '更新 ' + BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
 const STICK_CHANCE = 0.65;       // 黏贴機率（越高＝沙黏得越快、剩沙少→不易混色溢出）
@@ -1873,20 +1859,6 @@ document.getElementById('dumpBtn').addEventListener('click', () => { particles.c
     const m = Sound.toggle();
     muteBtn.textContent = m ? '🔇' : '🔊';
   });
-})();
-
-// 旋轉提示：玩家用 iOS 自己的旋轉鎖定。若畫面真的轉成橫向＝玩家沒鎖，蓋全螢幕提示轉回直式。
-(() => {
-  const hint = document.getElementById('rotateHint');
-  // 只對觸控裝置(手機/平板)提醒；桌面視窗本來就是寬的，不提示
-  const isTouch = window.matchMedia('(pointer: coarse)').matches;
-  function syncHint() {
-    const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-    hint.classList.toggle('show', isTouch && isLandscape);
-  }
-  window.addEventListener('orientationchange', () => { syncHint(); setTimeout(syncHint, 300); });
-  window.addEventListener('resize', syncHint);
-  syncHint();
 })();
 
 // Service Worker 註冊 + 更新按鈕
