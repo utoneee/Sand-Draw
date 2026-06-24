@@ -6,3 +6,10 @@ svg/
 ~$*
 .DS_Store
 Thumbs.db
+# 圖案匯入過程檔（提取/腳本/備份），只存本機
+*.bak
+_patch*.ps1
+_patch*.py
+demo.html
+*_extracted.txt
+執行extract.bat
