@@ -469,7 +469,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/24 23:55';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/25 00:15';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1929,8 +1929,8 @@ document.getElementById('dumpBtn').addEventListener('click', () => { particles.c
     await applyLock();
     updateBtn();
   });
-  // 橫放/直放切換時重新評估反轉
-  window.addEventListener('orientationchange', () => setTimeout(syncCssRotation, 250));
+  // 橫放/直放切換：立刻反轉(與 iOS 旋轉動畫同步，減少「轉一圈」感)，再延遲補一次校正尺寸
+  window.addEventListener('orientationchange', () => { syncCssRotation(); setTimeout(syncCssRotation, 300); });
   window.addEventListener('resize', syncCssRotation);
   // 進入遊戲時嘗試鎖定
   applyLock();
