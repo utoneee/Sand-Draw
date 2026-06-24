@@ -469,7 +469,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = '2026/06/24 23:30';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
+const BUILD = '2026/06/24 23:55';   // 更新版號：每次改完只動這一處，下面 JS 自動同步兩個顯示處
 ['ovUpd', 'ovUpd2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '更新 ' + BUILD; });
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1902,10 +1902,12 @@ document.getElementById('dumpBtn').addEventListener('click', () => { particles.c
     syncCssRotation();   // iOS fallback：原生失敗時靠 CSS 反轉
   }
   // 依鎖定狀態 + 目前是否橫放，決定要不要反轉 #app，並同步 screenRot 供座標換算
+  // 只在觸控裝置(手機/平板)套 CSS 反轉；桌面視窗本來就是寬的，不該被誤轉
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
   function syncCssRotation() {
     const isLandscape = window.matchMedia('(orientation: landscape)').matches;
     const body = document.body;
-    if (locked && isLandscape) {
+    if (isTouch && locked && isLandscape) {
       // window.orientation: 90=逆時針橫放 → 反向轉回(順時針)；其餘(-90/270)→逆時針
       const ccw = (window.orientation === 90);
       body.classList.add('lock-on');
