@@ -458,7 +458,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v29';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v30';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -796,7 +796,7 @@ function tintMask(mask, color) {
 
 // 把一個區塊畫到 ctx
 function paintRegion(ctx, region, opt) {
-  const ownM = region.ownMask || region.mask;         // ownMask＝實際擁有像素（重疊已解決）；mask＝圖檔遮罩
+  const ownM = region.ownMask;                        // ownMask＝實際擁有像素（重疊已解決）
   if (ownM) {
     ctx.save();
     ctx.globalAlpha = opt.alpha == null ? 1 : opt.alpha;
@@ -969,7 +969,6 @@ class LayerManager {
     this.coveredCount = 0;                     // 已填像素數（增量維護，免每幀全掃）
     this.totalCount = 0;                       // 已撕區塊的總像素數
     this._build();
-    this.regions.forEach((r, i) => { if (r.prePeel) this.peel(i + 1); });   // 開場自動撕開（如輪廓，可先填）
   }
   _build() {
     const off = document.createElement('canvas');
@@ -986,11 +985,11 @@ class LayerManager {
     });
     for (let p = 0; p < W * H; p++) { const r = this.regionId[p]; if (r) this.pxCount[r]++; }
     // 每塊「實際擁有的像素」遮罩：取自 regionId（重疊處後畫的贏），讓顯示/質感/高亮與「撕」的歸屬一致。
-    // 只給向量填色區塊套用；描線型(stroke)與圖檔遮罩(mask)維持原本畫法。
+    // 只給向量填色區塊套用；描線型(stroke)維持原本畫法。
     {
       const ids = this.regions.map(() => null);
       this.regions.forEach((region, i) => {
-        if (region.stroke || region.mask) return;
+        if (region.stroke) return;
         ids[i] = new ImageData(W, H);
       });
       for (let p = 0; p < W * H; p++) {
@@ -1005,14 +1004,7 @@ class LayerManager {
         region.ownMask = c;
       });
     }
-    // 背景遮罩聯集（快照時用來把「沒填的背景」洗成乾淨底紙）
     this.bgMaskUnion = null;
-    const bgRegs = this.regions.filter(r => r.bg && r.mask);
-    if (bgRegs.length) {
-      const u = document.createElement('canvas'); u.width = W; u.height = H;
-      const uc = u.getContext('2d'); bgRegs.forEach(r => uc.drawImage(r.mask, 0, 0));
-      this.bgMaskUnion = u;
-    }
   }
   peel(rid) {
     if (this.peeled.has(rid)) return;          // 防止重複撕導致總數重複累加
@@ -1300,7 +1292,7 @@ function drawTray() {
 }
 // 把紙纖維/膜光澤質感貼進某個「面」區塊
 function textureRegion(region, peeled) {
-  const ownM = region.ownMask || region.mask;
+  const ownM = region.ownMask;
   if (ownM) {                                         // 遮罩式區塊：先做質感再用遮罩裁形
     const t = document.createElement('canvas'); t.width = W; t.height = H;
     const tx = t.getContext('2d');
@@ -1479,7 +1471,6 @@ function drawBoard() {
   glueCtx.setLineDash([5, 3]);
   layers.regions.forEach((region, i) => {
     if (layers.peeled.has(i + 1)) return;
-    if (region.mask) return;                           // 遮罩區塊靠線稿顯示邊界，不畫刀模虛線
     glueCtx.globalAlpha = 0.5; glueCtx.lineWidth = 1; glueCtx.strokeStyle = TH.filmHi;
     glueCtx.save(); glueCtx.translate(0, -0.7);
     if (region.p2d) glueCtx.stroke(region.p2d); else { region.shape(glueCtx); glueCtx.stroke(); }
@@ -1488,36 +1479,6 @@ function drawBoard() {
     if (region.p2d) glueCtx.stroke(region.p2d); else { region.shape(glueCtx); glueCtx.stroke(); }
   });
   glueCtx.restore();
-  // 3b. 背景十字刀模虛線：沿中心十字切線畫虛線，只在「未撕的背景」上顯示（撕開即消失）
-  if (layers.pattern && layers.pattern.bgCross) {
-    const cx = layers.pattern.bgCross.x, cy = layers.pattern.bgCross.y;
-    const um = document.createElement('canvas'); um.width = W; um.height = H;
-    const uc = um.getContext('2d'); let any = false;
-    layers.regions.forEach((region, i) => {
-      if (!region.bg || layers.peeled.has(i + 1) || !region.mask) return;
-      uc.drawImage(region.mask, 0, 0); any = true;
-    });
-    if (any) {
-      const dc = document.createElement('canvas'); dc.width = W; dc.height = H;
-      const dx = dc.getContext('2d');
-      dx.lineCap = 'round'; dx.setLineDash([5, 3]);
-      dx.globalAlpha = 0.55; dx.lineWidth = 1; dx.strokeStyle = TH.filmHi;
-      dx.save(); dx.translate(0, -0.7);
-      dx.beginPath(); dx.moveTo(cx, 0); dx.lineTo(cx, H); dx.moveTo(0, cy); dx.lineTo(W, cy); dx.stroke(); dx.restore();
-      dx.globalAlpha = 0.6; dx.lineWidth = 1.3; dx.strokeStyle = TH.diecut;
-      dx.beginPath(); dx.moveTo(cx, 0); dx.lineTo(cx, H); dx.moveTo(0, cy); dx.lineTo(W, cy); dx.stroke();
-      dx.setLineDash([]); dx.globalAlpha = 1; dx.globalCompositeOperation = 'destination-in';
-      dx.drawImage(um, 0, 0);                            // 裁到「未撕背景」範圍
-      glueCtx.drawImage(dc, 0, 0);
-    }
-  }
-  // 4. 遮罩類題目：繪製線稿（像著色本的永久輪廓，讓圖一直認得出來）
-  if (layers.pattern && layers.pattern.lineMask) {
-    glueCtx.save();
-    glueCtx.globalAlpha = themeKey === 'light' ? 0.4 : 0.48;   // 淡導引線（輪廓是可填區，填上黑沙會蓋過它）
-    glueCtx.drawImage(tintMask(layers.pattern.lineMask, layers.pattern.lineColor || '#2c261f'), 0, 0);
-    glueCtx.restore();
-  }
   // 5. 待確認撕除高亮：畫在最上層（連同輪廓線/黑框一起變亮金），第二下才撕
   if (armedRegion && !layers.peeled.has(armedRegion)) {
     const region = layers.regions[armedRegion - 1];
@@ -1631,13 +1592,11 @@ function drawSilhouette(canvas, pattern, S) {
   x.fillStyle = TH.silTone; x.strokeStyle = TH.silTone; x.lineCap = 'round'; x.lineJoin = 'round';
   pattern.regions.forEach(r => {
     if (r.bg) return;                        // 背景不進剪影：選圖縮圖維持物件外型
-    if (r.mask) { x.drawImage(tintMask(r.mask, TH.silTone), 0, 0); }
-    else if (r.p2d) { if (r.stroke) { x.lineWidth = r.lw || 9; x.stroke(r.p2d); } else x.fill(r.p2d, r.fillRule); }
+    if (r.p2d) { if (r.stroke) { x.lineWidth = r.lw || 9; x.stroke(r.p2d); } else x.fill(r.p2d, r.fillRule); }
     else if (r.stroke) { x.lineWidth = r.lw || 9; r.shape(x); x.stroke(); }
     else { r.shape(x); x.fill(); }
     x.beginPath();
   });
-  if (pattern.lineMask) x.drawImage(tintMask(pattern.lineMask, TH.silTone), 0, 0);  // 填平縫隙，保持實心剪影
   x.restore();
 }
 
@@ -1705,41 +1664,6 @@ const focDots = document.getElementById('focDots');
 const focTilt = document.getElementById('focTilt');
 let focIdx = 0;
 PKEYS.forEach(() => { focDots.appendChild(document.createElement('i')); });
-
-// ── 從圖檔轉成的「遮罩式」題目（之後任何線稿都能照此加入）──
-function buildMaskPattern(url, meta, done) {
-  const im = new Image();
-  im.onload = () => {
-    const oc = document.createElement('canvas'); oc.width = W; oc.height = H;
-    const ox = oc.getContext('2d'); ox.drawImage(im, 0, 0, W, H);
-    const d = ox.getImageData(0, 0, W, H).data; const NP = W * H;
-    const n = meta.colors.length;
-    const imgs = []; for (let i = 0; i <= n; i++) imgs.push(new ImageData(W, H));
-    let lineHit = 0;
-    for (let p = 0; p < NP; p++) {
-      const idx = d[p * 4];
-      let t = -1;
-      if (idx >= 1 && idx <= n) t = idx - 1;
-      else if (idx === n + 1) t = n;
-      if (t >= 0) { const m = imgs[t].data; m[p*4]=255; m[p*4+1]=255; m[p*4+2]=255; m[p*4+3]=255; if (t === n) lineHit++; }
-    }
-    const canv = imgs.map(id => { const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d').putImageData(id, 0, 0); return c; });
-    const regions = meta.colors.map((col, i) => {
-      const key = (meta.keys && meta.keys[i]) || ('r' + i);
-      return { key, color: col, mask: canv[i],
-        bg: meta.bgCount ? i >= n - meta.bgCount : false,                       // 最後 bgCount 塊 = 背景
-        prePeel: !!(meta.prePeelKeys && meta.prePeelKeys.includes(key)) };       // 開場自動撕開（如輪廓，可先填）
-    });
-    let lineMask = lineHit ? canv[n] : null;                                     // 傳統向量輪廓（n+1 索引）
-    if (meta.lineFromKey) { const lr = regions.find(r => r.key === meta.lineFromKey); if (lr) lineMask = lr.mask; }  // 輪廓既是可填區塊、又當淡導引線
-    done({ name: meta.name, en: meta.en, tag: meta.tag, regions, lineMask, lineColor: meta.lineColor || '#2c261f', bgCross: meta.bgCross || null });
-  };
-  im.onerror = () => console.warn('遮罩題目載入失敗:', url);
-  im.src = url;
-}
-
-// 圖片式圖案範例（翠鳥）已移除——buildMaskPattern 基礎設施保留，
-// 之後要加點陣圖圖案時，把 PNG 放進 patterns/ 再用同樣寫法呼叫即可。
 
 function renderFocus() {
   const key = PKEYS[focIdx], p = PATTERNS[key], done = isDone(key);
