@@ -458,7 +458,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v27-mixA1試';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v27-mixA1b';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
@@ -1120,7 +1120,7 @@ class ParticleSystem {
         const _px = stuckCtx.getImageData(s.x | 0, s.y | 0, 1, 1).data;
         if (_px[3] > 40) {
           const _d = Math.abs(_px[0] - _sh.base[0]) + Math.abs(_px[1] - _sh.base[1]) + Math.abs(_px[2] - _sh.base[2]);
-          if (_d > 60) _a = 0.55;               // 與底色明顯不同 → 半透明混色
+          if (_d > 40) _a = 0.42;               // 與底色不同 → 半透明混色（更透＝混更深）
         }
         stuckCtx.globalAlpha = _a;
         stuckCtx.fillStyle = rgbStr(_sh.base);
