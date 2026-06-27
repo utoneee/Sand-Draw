@@ -458,7 +458,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v27-mixB2';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v27-mixB3';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -1123,8 +1123,10 @@ class ParticleSystem {
         if (_px[3] > 40) {
           const _d = Math.abs(_px[0] - _sh.base[0]) + Math.abs(_px[1] - _sh.base[1]) + Math.abs(_px[2] - _sh.base[2]);
           const _nl = 0.299 * _sh.base[0] + 0.587 * _sh.base[1] + 0.114 * _sh.base[2];
-          // 不同色才混；新沙接近白則跳過（相乘下白＝單位元，會被底色吃掉 → 維持純白）
-          if (_d > MIX_THRESH && _nl < 225) {
+          // 不同色才混；只有「近純白」跳過（相乘下白＝單位元會被底色吃掉）。
+          // 用「最低色版 > 240」判白：純白三版皆 255；米白/奶油帶黃，最低版偏低 → 照常混。
+          const _wht = Math.min(_sh.base[0], _sh.base[1], _sh.base[2]) > 240;
+          if (_d > MIX_THRESH && !_wht) {
             let t = MIX_STRENGTH;
             const _ol = 0.299 * _px[0] + 0.587 * _px[1] + 0.114 * _px[2];
             // 深+深補丁：兩色都暗時相乘易塌黑，依「較亮者」亮度收斂混色強度（淺+深不受影響）
