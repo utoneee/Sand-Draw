@@ -458,13 +458,13 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v27-mixB';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v27-mixB2';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
-const MIX_STRENGTH = 0.6;        // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
+const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
 const MIX_THRESH = 40;           // 判定「不同色」門檻（曼哈頓色差）：低於此視為同色不混，純色區乾淨
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
-const STICK_CHANCE = 0.65;       // 黏贴機率（越高＝沙黏得越快、剩沙少→不易混色溢出）
+const STICK_CHANCE = 0.8;        // 黏贴機率（越高＝沙黏得越快、剩沙少→不易混色溢出）
 const ACCEL = 1.1;               // 重力加速係數（提高＝沙落得更乾脆，不慢飄）
 const DAMP = 0.8;                // 阻尼（低＝摩擦大、會停下不飄）
 const MAX_SPEED = 7.5;
@@ -1122,12 +1122,18 @@ class ParticleSystem {
         const _px = stuckCtx.getImageData(s.x | 0, s.y | 0, 1, 1).data;
         if (_px[3] > 40) {
           const _d = Math.abs(_px[0] - _sh.base[0]) + Math.abs(_px[1] - _sh.base[1]) + Math.abs(_px[2] - _sh.base[2]);
-          if (_d > MIX_THRESH) {
-            const t = MIX_STRENGTH;             // 往「相乘結果」拉的比例（避免一步到全黑）
+          const _nl = 0.299 * _sh.base[0] + 0.587 * _sh.base[1] + 0.114 * _sh.base[2];
+          // 不同色才混；新沙接近白則跳過（相乘下白＝單位元，會被底色吃掉 → 維持純白）
+          if (_d > MIX_THRESH && _nl < 225) {
+            let t = MIX_STRENGTH;
+            const _ol = 0.299 * _px[0] + 0.587 * _px[1] + 0.114 * _px[2];
+            // 深+深補丁：兩色都暗時相乘易塌黑，依「較亮者」亮度收斂混色強度（淺+深不受影響）
+            const _brt = Math.max(_ol, _nl);
+            if (_brt < 110) t *= 0.3 + 0.7 * (_brt / 110);
             const _m = i => clamp8(_sh.base[i] + (_px[i] * _sh.base[i] / 255 - _sh.base[i]) * t);
             _baseRGB = [_m(0), _m(1), _m(2)];
-            // grain 量化成 16 階混色 hex，避免每種混色都烘焙新 sprite（cache 失控）
-            _grainHex = '#' + _baseRGB.map(v => (((v >> 4) << 4) | 8).toString(16).padStart(2, '0')).join('');
+            // grain 量化成 32 階混色 hex（步幅減半，過渡更平滑、不像單色雜質），仍避免 sprite cache 失控
+            _grainHex = '#' + _baseRGB.map(v => (((v >> 3) << 3) | 4).toString(16).padStart(2, '0')).join('');
           }
         }
         stuckCtx.fillStyle = rgbStr(_baseRGB);
