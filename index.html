@@ -458,7 +458,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v27';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v28';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -1052,6 +1052,7 @@ class LayerManager {
 class ParticleSystem {
   constructor() { this.list = []; }
   scoop(color, n) {
+    let added = 0;
     for (let i = 0; i < n && this.list.length < MAX_PARTICLES; i++) {
       const a = Math.random() * 7, rr = Math.random() * 48;
       this.list.push({
@@ -1062,7 +1063,9 @@ class ParticleSystem {
         r: (3 + Math.random() * 2) * SAND_SIZE,
         c: color,
       });
+      added++;
     }
+    return added;                                // 回傳實際倒出顆數：0＝容器已滿（供音效判斷）
   }
   scoopAt(color, n, cx, cy) {                  // 桌面測試：在指定座標撒沙（Shift+拖曳畫沙用）
     for (let i = 0; i < n && this.list.length < MAX_PARTICLES; i++) {
@@ -1365,6 +1368,26 @@ const Sound = {
     src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
     src.start(t); src.stop(t + 0.76);
   },
+  _fullAt: 0,
+  full() {                                    // 容器已滿提示：柔和下行兩音（G4→D4），與倒沙(噪音流)、完成(上行三音)明顯區隔
+    if (this.muted || !this.ctx) return;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const now = this.ctx.currentTime;
+    if (now - this._fullAt < 0.4) return;     // 節流：連點不洗版
+    this._fullAt = now;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.5;  // 低通＝悶柔不刺耳
+    lp.connect(this.ctx.destination);
+    [392.0, 293.66].forEach((f, i) => {       // 下行＝「不行/滿了」語意（對比 ding 的上行）
+      const t = now + i * 0.13;
+      const o = this.ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.055, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0006, t + 0.28);
+      o.connect(g); g.connect(lp);
+      o.start(t); o.stop(t + 0.3);
+    });
+  },
   _ensureSlideOut() {
     if (this._slideOut || !this.ctx) return;
     this._slideOut = this.ctx.createGain(); this._slideOut.gain.value = 1.0;
@@ -1561,8 +1584,10 @@ function buildSwatches() {
     s.addEventListener('click', () => {
       colorRow.querySelectorAll('.swatch').forEach(el => el.classList.remove('sel'));
       s.classList.add('sel'); selColor = col;
-      Sound.init(); Sound.pour();
-      particles.scoop(col, SCOOP_AMOUNT);
+      Sound.init();
+      const added = particles.scoop(col, SCOOP_AMOUNT);
+      if (added > 0) Sound.pour();               // ① 真的倒出沙才播倒沙聲
+      else Sound.full();                          // ② 容器滿、沒倒出 → 播提示音（傾斜讓沙黏住空出容量）
     });
     colorRow.appendChild(s);
   });
