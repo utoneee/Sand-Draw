@@ -93,6 +93,14 @@
     cursor: pointer; transition: transform .08s ease;
   }
   .pillBtn:active, .iconBtn:active { transform: scale(.94); }
+  .pillBtn { display: inline-flex; align-items: center; gap: 5px; }
+  .iconBtn svg { width: 18px; height: 18px; }
+  .pillBtn svg { width: 15px; height: 15px; }
+  #dumpBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  #dumpBtn svg { width: 17px; height: 17px; }
+  @media (hover:hover) { .iconBtn:hover, .pillBtn:hover { border-color: var(--accent); } }
+  .iconBtn.spin svg { animation: btnspin .8s linear infinite; }
+  @keyframes btnspin { to { transform: rotate(360deg); } }
 
   /* 沙盤 + 側欄 */
   .playRow { display: flex; gap: 12px; align-items: stretch; }
@@ -345,11 +353,11 @@
 <div id="app" class="picking">
   <div class="device">
     <div class="topbar">
-      <button id="changeBtn" class="gameUi pillBtn">← 換圖案</button>
+      <button id="changeBtn" class="gameUi pillBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>換圖案</button>
       <span class="rotTip gameUi">🔒 遊玩時須鎖定螢幕旋轉</span>
       <div class="tbRight gameUi">
-        <button id="muteBtn" class="iconBtn" title="音效開關">🔊</button>
-        <button id="gearBtn" class="iconBtn" title="工具">⚙</button>
+        <button id="muteBtn" class="iconBtn" title="音效開關" aria-label="音效開關"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2l3.5-4.5a.8.8 0 0 1 1.5.5v14a.8.8 0 0 1-1.5.5L6 15"/><path d="M15 8a5 5 0 0 1 0 8"/><path d="M17.7 5a9 9 0 0 1 0 14"/></svg></button>
+        <button id="gearBtn" class="iconBtn" title="工具" aria-label="工具"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="6" r="2"/><path d="M4 6h8M16 6h4"/><circle cx="8" cy="12" r="2"/><path d="M4 12h2M10 12h10"/><circle cx="17" cy="18" r="2"/><path d="M4 18h11M19 18h1"/></svg></button>
       </div>
     </div>
     <div id="toolPanel" class="gameUi">
@@ -392,13 +400,13 @@
         <div id="colorTabs"></div>
         <div id="colorRow"></div>
         <div class="tools">
-          <button id="dumpBtn" class="iconBtn" title="倒掉散沙">↺ 清沙</button>
+          <button id="dumpBtn" class="iconBtn" title="倒掉散沙"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.55a8 8 0 0 1 6 14.9M15 15v5h5"/></svg>清沙</button>
         </div>
       </div>
     </div>
 
     <div class="baseline gameUi"><div id="progressBar"></div></div>
-    <div class="hint gameUi" id="hint">點顏色倒沙 · 拖曳盤面傾斜（或晃動 iPad）讓沙流動黏住 · 輕點擕開貼紙 · 填好按 ↺</div>
+    <div class="hint gameUi" id="hint">點顏色倒沙 · 拖曳盤面傾斜（或晃動 iPad）讓沙流動黏住 · 輕點擕開貼紙 · 填好按「清沙」</div>
   </div>
 </div>
 
@@ -407,9 +415,9 @@
   <div class="ovTop">
     <span class="ovTitle">沙畫</span>
     <span class="ovUpd" id="ovUpd"></span>
-    <button id="updateBtn" class="iconBtn" title="檢查更新">↻</button>
-    <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄">🗑</button>
-    <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白">☀</button>
+    <button id="updateBtn" class="iconBtn" title="檢查更新" aria-label="檢查更新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg></button>
+    <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄" aria-label="清除已完成紀錄"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></button>
+    <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白" aria-label="切換深灰／淨白"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M5.6 18.4l.7-.7M17.7 6.3l.7-.7"/></svg></button>
   </div>
   <div class="galScroll">
     <div class="galHead">
@@ -458,7 +466,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v30';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v31';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -1816,11 +1824,18 @@ loop();
 
 // 控制鈕
 document.getElementById('dumpBtn').addEventListener('click', () => { particles.clear(); Sound.slideOff(); });
+// 功能按鈕圖示（inline SVG，吃 currentColor 跟主題／accent 走）：切換態用
+const ICON = {
+  vol:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2l3.5-4.5a.8.8 0 0 1 1.5.5v14a.8.8 0 0 1-1.5.5L6 15"/><path d="M15 8a5 5 0 0 1 0 8"/><path d="M17.7 5a9 9 0 0 1 0 14"/></svg>',
+  volOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2l3.5-4.5a.8.8 0 0 1 1.5.5v14a.8.8 0 0 1-1.5.5L6 15"/><path d="M16 9l5 6M21 9l-5 6"/></svg>',
+  sun:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M5.6 18.4l.7-.7M17.7 6.3l.7-.7"/></svg>',
+  moon:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13a8 8 0 1 1-9-9 6 6 0 0 0 9 9Z"/></svg>',
+};
 (() => {
   const muteBtn = document.getElementById('muteBtn');
   muteBtn.addEventListener('click', () => {
     const m = Sound.toggle();
-    muteBtn.textContent = m ? '🔇' : '🔊';
+    muteBtn.innerHTML = m ? ICON.volOff : ICON.vol;
   });
 })();
 
@@ -1830,7 +1845,7 @@ if ('serviceWorker' in navigator) {
 }
 document.getElementById('updateBtn').addEventListener('click', async () => {
   const btn = document.getElementById('updateBtn');
-  btn.textContent = '…';
+  btn.classList.add('spin');
   try {
     const regs = await navigator.serviceWorker.getRegistrations();
     for (const r of regs) await r.unregister();
@@ -1851,7 +1866,7 @@ function applyTheme(key) {
   _grainCache.clear(); _spriteCache.clear();
   themeKey = key; TH = THEMES[key];
   document.documentElement.classList.toggle('light', key === 'light');
-  const tg = document.getElementById('themeBtnG'); if (tg) tg.textContent = key === 'light' ? '☾' : '☀';
+  const tg = document.getElementById('themeBtnG'); if (tg) tg.innerHTML = key === 'light' ? ICON.moon : ICON.sun;
   document.querySelectorAll('#panelTheme .segBtn').forEach(b => b.classList.toggle('sel', b.dataset.theme === key));
   drawTray();
   drawBoard();
