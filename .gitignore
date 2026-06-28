@@ -13,3 +13,5 @@ _patch*.py
 demo.html
 *_extracted.txt
 執行extract.bat
+# 圖案來源 SVG 批次資料夾（只存本機，不發布）
+0628*/

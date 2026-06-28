@@ -1,6 +1,6 @@
 // 網路優先：有網路就拿最新版，離線才用快取
-const CACHE = 'sandplay-v1';
-const PRECACHE = ['./index.html', './manifest.json', './icon.svg'];
+const CACHE = 'sandplay-v2';
+const PRECACHE = ['./index.html', './manifest.json', './icon2.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)));
