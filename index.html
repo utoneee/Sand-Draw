@@ -70,7 +70,8 @@
   }
 
   /* 旋轉提示：遊玩頁 topbar 靜態小字，提醒鎖定螢幕旋轉 */
-  .rotTip { font-size: 11px; color: var(--muted); letter-spacing: .3px; white-space: nowrap; opacity: .85; }
+  .rotTip { font-size: 11px; color: var(--muted); letter-spacing: .3px; white-space: nowrap; opacity: .85; display: inline-flex; align-items: center; gap: 4px; }
+  .rotTip svg { width: 13px; height: 13px; flex: 0 0 auto; }
 
   /* 機身外框 */
   .device {
@@ -80,22 +81,24 @@
     position: relative;
   }
   .topbar { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
-  .topbar .tbRight { margin-left: auto; display: flex; gap: 6px; }
+  /* 兩顆(音效＋工具)放大並對齊到 ABC 那排寬度(3×24+2×5=82px)、置中在 rail 正上方 */
+  .topbar .tbRight { margin-left: auto; display: flex; gap: 6px; width: 100px; justify-content: center; }
+  .topbar .tbRight .iconBtn { width: 38px; height: 38px; }
   .pillBtn {
-    font-family: inherit; font-size: 12px; font-weight: 500; white-space: nowrap;
-    padding: 7px 13px; border-radius: 20px; background: var(--btnBg); color: var(--onFrame);
+    font-family: inherit; font-size: 13px; font-weight: 500; white-space: nowrap;
+    padding: 8px 15px; border-radius: 20px; background: var(--btnBg); color: var(--onFrame);
     border: 1px solid var(--btnBd); cursor: pointer; transition: transform .08s ease;
   }
   .iconBtn {
-    width: 34px; height: 34px; border-radius: 50%; padding: 0; flex: 0 0 auto;
+    width: 40px; height: 40px; border-radius: 50%; padding: 0; flex: 0 0 auto;
     display: flex; align-items: center; justify-content: center; font-size: 15px;
     background: var(--btnBg); color: var(--onFrame); border: 1px solid var(--btnBd);
     cursor: pointer; transition: transform .08s ease;
   }
   .pillBtn:active, .iconBtn:active { transform: scale(.94); }
   .pillBtn { display: inline-flex; align-items: center; gap: 5px; }
-  .iconBtn svg { width: 18px; height: 18px; }
-  .pillBtn svg { width: 15px; height: 15px; }
+  .iconBtn svg { width: 21px; height: 21px; }
+  .pillBtn svg { width: 16px; height: 16px; }
   #dumpBtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
   #dumpBtn svg { width: 17px; height: 17px; }
   @media (hover:hover) { .iconBtn:hover, .pillBtn:hover { border-color: var(--accent); } }
@@ -355,7 +358,7 @@
   <div class="device">
     <div class="topbar">
       <button id="changeBtn" class="gameUi pillBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>換圖案</button>
-      <span class="rotTip gameUi">🔒 遊玩時須鎖定螢幕旋轉</span>
+      <span class="rotTip gameUi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>遊玩時須鎖定螢幕旋轉</span>
       <div class="tbRight gameUi">
         <button id="muteBtn" class="iconBtn" title="音效開關" aria-label="音效開關"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2l3.5-4.5a.8.8 0 0 1 1.5.5v14a.8.8 0 0 1-1.5.5L6 15"/><path d="M15 8a5 5 0 0 1 0 8"/><path d="M17.7 5a9 9 0 0 1 0 14"/></svg></button>
         <button id="gearBtn" class="iconBtn" title="工具" aria-label="工具"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="6" r="2"/><path d="M4 6h8M16 6h4"/><circle cx="8" cy="12" r="2"/><path d="M4 12h2M10 12h10"/><circle cx="17" cy="18" r="2"/><path d="M4 18h11M19 18h1"/></svg></button>
@@ -467,7 +470,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v33';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v34';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
