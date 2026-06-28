@@ -121,7 +121,8 @@
   #stage > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
   .rail { width: 100px; display: flex; flex-direction: column; align-items: center; }
-  .rail #colorRow { display: grid; grid-template-columns: repeat(2, 34px); gap: 22px 26px; justify-content: center; }
+  /* min-height 固定保留最多色盤(B=18 色/9 列=9*34+8*22=482px)的高度，切換 A/B/C 不跑版 */
+  .rail #colorRow { display: grid; grid-template-columns: repeat(2, 34px); gap: 22px 26px; justify-content: center; align-content: start; min-height: 482px; }
   .rail #colorTabs { display: flex; gap: 5px; margin-bottom: 9px; justify-content: center; }
   .grpTab { width: 24px; height: 24px; border-radius: 7px; padding: 0; font-size: 12px; font-weight: 600;
     background: var(--btnBg); color: var(--muted); border: 1px solid var(--btnBd); cursor: pointer; transition: transform .08s; }
@@ -466,7 +467,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v32';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v33';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
