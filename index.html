@@ -225,24 +225,14 @@
   }
   .screen-ov.show { display: flex; }
   .ovTop { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top,10px) + 12px) 22px 6px; }
-  .ovTop .ovTitle { font-size: 16px; font-weight: 600; letter-spacing: 3px; margin-right: auto; }
-  .ovUpd { font-size: 11px; color: var(--muted); letter-spacing: .5px; white-space: nowrap; opacity: .95; }
+  .ovUpd { font-size: 11px; color: var(--muted); letter-spacing: .5px; white-space: nowrap; opacity: .95; margin-left: auto; }
 
-  .galScroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 6px 22px calc(env(safe-area-inset-bottom,16px) + 28px); }
+  .galScroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 6px 22px calc(env(safe-area-inset-bottom,16px) + 28px); scrollbar-width: none; }
+  .galScroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
   .galHead { padding: 14px 2px 18px; }
   .galHead .over { font-size: 10px; letter-spacing: 4px; color: var(--accent); font-weight: 600; }
   .galHead h2 { font-size: 25px; font-weight: 650; margin: 9px 0 5px; letter-spacing: 1px; }
-  .galHead .s { font-size: 11px; color: var(--muted); letter-spacing: 2px; }
-
-  .heroRandom { width: 100%; display: flex; align-items: center; gap: 14px; text-align: left; cursor: pointer;
-    padding: 15px 16px; border-radius: 18px; margin-bottom: 18px; font-family: inherit; color: var(--onFrame);
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 7%, transparent));
-    border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent); transition: transform .1s ease; }
-  .heroRandom:active { transform: scale(.99); }
-  .heroRandom .t { font-size: 15px; font-weight: 650; letter-spacing: .5px; }
-  .heroRandom .d { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .heroRandom .sh { margin-left: auto; width: 48px; height: 48px; border-radius: 50%; flex: 0 0 auto;
-    display: flex; align-items: center; justify-content: center; background: var(--accent); color: #20242a; }
+  .galHead h2.brand { font-size: 31px; font-weight: 650; letter-spacing: 4px; }
 
   .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
@@ -261,7 +251,7 @@
   .gcTag { font-size: 9.5px; color: var(--muted); padding-left: 2px; letter-spacing: 1px; margin-top: 1px; }
 
   /* 單張聚焦 */
-  .focTop { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top,10px) + 14px) 22px 0; }
+  .focTop { width: min(74vw, 300px); display: flex; align-items: center; justify-content: space-between; padding: 0; }
   .ovGhost { font-family: inherit; font-size: 13px; color: var(--muted); background: none; border: none; cursor: pointer; }
   .ovChip { font-family: inherit; font-size: 12px; color: var(--accent); cursor: pointer;
     background: none; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); padding: 7px 13px; border-radius: 16px; }
@@ -269,11 +259,11 @@
     padding: 16px 26px calc(env(safe-area-inset-bottom,16px) + 24px); }
   .focBig canvas { width: min(74vw, 300px); height: min(74vw, 300px); border-radius: 22px;
     box-shadow: 0 24px 48px -18px rgba(0,0,0,.55), inset 0 2px 8px -3px rgba(0,0,0,.28); }
-  .focCap { display: flex; align-items: center; justify-content: center; gap: 16px; }
+  .focCap { width: min(74vw, 300px); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .focNav { width: 42px; height: 42px; border-radius: 50%; cursor: pointer; flex: 0 0 auto;
     background: var(--btnBg); border: 1px solid var(--btnBd); color: var(--onFrame); font-size: 18px;
     display: flex; align-items: center; justify-content: center; }
-  .focCapMid { text-align: center; min-width: 116px; }
+  .focCapMid { flex: 1; min-width: 0; text-align: center; }
   .focCapMid .nm { font-size: 24px; font-weight: 650; letter-spacing: 2px; }
   .focCapMid .tg { font-size: 11px; color: var(--accent); letter-spacing: 3px; margin-top: 4px; }
   .focGrain { display: flex; align-items: center; gap: 10px; }
@@ -282,9 +272,6 @@
   .gOpt { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer;
     background: var(--btnBg); border: 1px solid var(--bd); border-radius: 12px; padding: 7px 14px; }
   .gOpt.sel { color: var(--onFrame); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .focDots { display: flex; gap: 6px; }
-  .focDots i { width: 6px; height: 6px; border-radius: 50%; background: var(--lineTrack); }
-  .focDots i.on { background: var(--accent); width: 18px; border-radius: 4px; }
   .focStart { font-family: inherit; font-size: 15px; font-weight: 650; color: #20242a; cursor: pointer; white-space: nowrap;
     background: var(--accent); border: none; padding: 14px 46px; border-radius: 28px; letter-spacing: 1px;
     box-shadow: 0 12px 24px -12px color-mix(in srgb, var(--accent) 80%, transparent); transition: transform .1s ease; }
@@ -321,28 +308,61 @@
   #sizeRange::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #f0ece5; box-shadow: 0 2px 5px rgba(0,0,0,.4); cursor: pointer; }
   #sizeRange::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%; background: #f0ece5; box-shadow: 0 2px 5px rgba(0,0,0,.4); cursor: pointer; }
 
-  /* 標題旁的隨機鈕 */
+  /* 大標「沙畫」那一列（右側放隨機/收藏圓鈕）*/
   .titleRow { display: flex; align-items: center; gap: 13px; margin: 9px 0 5px; }
   .titleRow h2 { margin: 0; white-space: nowrap; }
-  .randomBtn { width: 42px; height: 42px; border-radius: 50%; flex: 0 0 auto; cursor: pointer; border: none;
-    background: var(--accent); color: #2a2017; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--accent) 75%, transparent); transition: transform .14s ease; }
-  .randomBtn:active { transform: scale(.9) rotate(-14deg); }
-  .randomBtn svg { width: 21px; height: 21px; }
 
   /* 亮色版：減輕陰影深度 */
   html.light .focBig canvas { box-shadow: 0 14px 30px -16px rgba(80,72,60,.30), inset 0 2px 8px -3px rgba(80,72,60,.16); }
   html.light .galCard canvas { box-shadow: inset 0 1px 4px -2px rgba(80,72,60,.18); }
   .ovGhost, .ovChip, .gOpt, .focGrain > span, .focCapMid .nm { white-space: nowrap; }
 
-  /* ── 成就 · 美術館方向：襯線標題、完成卡鑲金線、小金點 ── */
+  /* ── v36：選圖頁大標的圓鈕（隨機笑臉／收藏愛心，外框不變色）── */
+  .heroBtns { display: flex; gap: 9px; margin-left: auto; }
+  .circBtn { width: 44px; height: 44px; border-radius: 50%; flex: 0 0 auto; cursor: pointer; font-family: inherit;
+    background: var(--btnBg); border: 1px solid var(--btnBd); color: var(--onFrame);
+    display: flex; align-items: center; justify-content: center; transition: border-color .15s, transform .12s ease; }
+  .circBtn:hover { border-color: var(--bd-strong); }
+  .circBtn:active { transform: scale(.92); }
+  .circBtn svg { width: 22px; height: 22px; }
+
+  /* ── v36：返回鈕（確定頁／收藏頁共用，箭頭統一）── */
+  .navBack { font-family: inherit; font-size: 14px; color: var(--muted); background: none; border: none; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px; padding: 4px 2px; }
+  .navBack svg { width: 16px; height: 16px; }
+
+  /* ── v36：確定頁「換一張」文字＋笑臉圓鈕 ── */
+  .rerollWrap { display: flex; align-items: center; gap: 9px; margin-left: auto; }
+  .rerollLbl { font-size: 13px; color: var(--muted); letter-spacing: 1px; }
+
+  /* ── v36：收藏（展示）頁 ── */
+  .albTitle { font-size: 16px; font-weight: 600; letter-spacing: 3px; margin-left: 4px; }
+  .albEditBtn { font-family: inherit; font-size: 12px; color: var(--onFrame); cursor: pointer; margin-left: auto;
+    background: none; border: 1px solid var(--btnBd); padding: 7px 14px; border-radius: 15px; }
+  .albBar { display: none; align-items: center; justify-content: space-between; padding: 0 22px 6px;
+    font-size: 13px; color: var(--muted); }
+  #album.editing .albBar { display: flex; }
+  .albBar b { color: var(--onFrame); }
+  .albDel { font-family: inherit; font-size: 13px; cursor: pointer; padding: 6px 15px; border-radius: 15px;
+    background: transparent; border: 1px solid color-mix(in srgb, #d8694f 60%, transparent); color: #e0907e; }
+  .albEmpty { display: none; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.9; padding: 60px 20px; }
+  .albCard { position: relative; border: 1px solid var(--bd); border-radius: 16px; padding: 0; overflow: hidden; cursor: pointer;
+    background: var(--btnBg); transition: transform .12s ease, border-color .15s; }
+  .albCard:active { transform: scale(.96); }
+  .albCard canvas { width: 100%; height: auto; display: block; }
+  #album.editing .albCard { cursor: default; }
+  .albCard .chk { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(20,20,22,.5); border: 1.5px solid #fff; color: transparent;
+    display: none; align-items: center; justify-content: center; }
+  #album.editing .albCard .chk { display: flex; }
+  .albCard .chk svg { width: 15px; height: 15px; }
+  .albCard.sel { border-color: var(--accent); }
+  .albCard.sel .chk { background: var(--accent); border-color: var(--accent); color: #2a2017; }
+
+  /* ── 美術館方向：襯線標題（招牌「沙畫」與題名）── */
   .galHead h2 { font-family: var(--font-serif); font-weight: 600; }
-  .ovTop .ovTitle, .focCapMid .nm { font-family: var(--font-serif); }
+  .focCapMid .nm { font-family: var(--font-serif); }
   .gcName { font-family: var(--font-serif); display: flex; align-items: center; gap: 7px; }
-  .gcDot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: 0 0 auto;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
-  .galCard.done { border-color: color-mix(in srgb, var(--accent) 34%, var(--bd)); }
-  .galCard.done canvas { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), inset 0 2px 6px -2px rgba(0,0,0,.26); }
   html.light .galCard.done canvas { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), inset 0 1px 4px -2px rgba(80,72,60,.18); }
   /* 完成揭曉：沙面微光由下而上掃過一次 */
   #winShimmer { position: absolute; left: -10%; right: -10%; height: 55%; bottom: -55%; z-index: 5; pointer-events: none; opacity: 0;
@@ -417,20 +437,20 @@
 <!-- 畫廊主畫面 -->
 <div id="gallery" class="screen-ov show">
   <div class="ovTop">
-    <span class="ovTitle">沙畫</span>
     <span class="ovUpd" id="ovUpd"></span>
     <button id="updateBtn" class="iconBtn" title="檢查更新" aria-label="檢查更新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg></button>
-    <button id="clearRecBtnG" class="iconBtn" title="清除已完成紀錄" aria-label="清除已完成紀錄"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白" aria-label="切換深灰／淨白"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M5.6 18.4l.7-.7M17.7 6.3l.7-.7"/></svg></button>
   </div>
   <div class="galScroll">
     <div class="galHead">
-      <div class="over">SANDPLAY</div>
+      <div class="over">PEEL · POUR · PAINT</div>
       <div class="titleRow">
-        <h2>選一幅，靜下來</h2>
-        <button class="randomBtn" id="heroRandom" title="交給命運 · 隨機一幅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="1"/><path d="M4 13h16M12 10v10"/><path d="M12 10S11 4 8.5 4a2 2 0 1 0 0 6zM12 10s1-6 3.5-6a2 2 0 1 1 0 6z"/></svg></button>
+        <h2 class="brand">沙畫</h2>
+        <div class="heroBtns">
+          <button class="circBtn" id="heroRandom" title="隨機一幅" aria-label="隨機一幅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01"/><path d="M8.5 14.5a4 4 0 0 0 7 0"/></svg></button>
+          <button class="circBtn" id="albumBtn" title="收藏" aria-label="收藏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-9.4-9A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 9.4 5c-2.4 4.4-9.4 9-9.4 9z"/></svg></button>
+        </div>
       </div>
-      <div class="s">CHOOSE A PIECE TO BEGIN</div>
     </div>
     <div class="chips" id="chips"></div>
     <div class="galGrid" id="galGrid"></div>
@@ -439,12 +459,15 @@
 
 <!-- 單張聚焦 -->
 <div id="focus" class="screen-ov">
-  <div class="focTop">
-    <button id="focBack" class="ovGhost">‹ 回畫廊</button>
-    <button id="focShuffle" class="ovChip">再抽一張</button>
-  </div>
   <div class="focStage">
-    <div class="focBig">
+    <div class="focTop">
+      <button id="focBack" class="navBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>返回</button>
+      <div class="rerollWrap">
+        <span class="rerollLbl">換一張</span>
+        <button id="focShuffle" class="circBtn" title="換一張" aria-label="換一張"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01"/><path d="M8.5 14.5a4 4 0 0 0 7 0"/></svg></button>
+      </div>
+    </div>
+    <div class="focBig" id="focBig">
       <canvas id="focCanvas"></canvas>
     </div>
     <div class="focCap">
@@ -455,9 +478,25 @@
       </div>
       <button id="focNext" class="focNav">›</button>
     </div>
-    <div class="focDots" id="focDots"></div>
     <button id="focStart" class="focStart">開始這一幅</button>
     <div class="focTilt" id="focTilt"></div>
+  </div>
+</div>
+
+<!-- 收藏（展示頁）：畫完的作品都收進來，可進編輯模式批次刪 -->
+<div id="album" class="screen-ov">
+  <div class="ovTop">
+    <button id="albBack" class="navBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg>返回</button>
+    <span class="albTitle">收藏</span>
+    <button id="albEdit" class="albEditBtn">編輯</button>
+  </div>
+  <div id="albBar" class="albBar">
+    <span>已選 <b id="albSelN">0</b> 張</span>
+    <button id="albDel" class="albDel">刪除所選</button>
+  </div>
+  <div class="galScroll">
+    <div id="albGrid" class="galGrid"></div>
+    <div id="albEmpty" class="albEmpty">還沒有收藏的作品<br>畫完一幅，就會收進這裡</div>
   </div>
 </div>
 
@@ -470,7 +509,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v35';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v36';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 300;        // 單次倒沙量（少量＝一區約倒3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -1440,12 +1479,26 @@ const Sound = {
   },
 };
 
-// ── 成就：本機儲存「已完成」作品＋快照（重開還在，不需登入）──
-const SAVE_KEY = 'sandplay.completed.v1';
-let COMPLETED = {};
-try { COMPLETED = JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) {}
-function isDone(key) { return !!(COMPLETED[key] && COMPLETED[key].thumb); }
-function saveCompleted() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(COMPLETED)); } catch (e) {} }
+// ── 收藏：本機相簿（每完成一幅存一筆，可重複、可刪；重開還在，不需登入）──
+const SAVE_KEY = 'sandplay.album.v2';
+const OLD_KEY  = 'sandplay.completed.v1';   // 舊版「每幅一格」格式，首次載入自動遷移
+let ALBUM = [];
+let sessionEntryId = null;                  // 本場完成所對應的那一筆（同場更新、再玩才算新一筆）
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function saveAlbum() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(ALBUM)); } catch (e) {} }
+(function loadAlbum() {
+  let cur = null;
+  try { cur = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
+  if (Array.isArray(cur)) { ALBUM = cur; return; }
+  try {
+    const old = JSON.parse(localStorage.getItem(OLD_KEY)) || {};
+    Object.keys(old).forEach(k => {
+      if (old[k] && old[k].thumb) ALBUM.push({ id: genId(), key: k, thumb: old[k].thumb, at: old[k].at || Date.now() });
+    });
+    ALBUM.sort((a, b) => a.at - b.at);
+  } catch (e) {}
+  saveAlbum();
+})();
 // 把沙盤合成一張，存成你「親手上色那一幅」的真實快照
 // 只拍已點定的作品（托盤＋貼紙板＋黏住的沙），不拍還在落的浮沙 → 與落沙時機無關
 function captureSnapshot() {
@@ -1592,8 +1645,8 @@ const PKEYS = Object.keys(PATTERNS).reverse();
   if (a >= 0 && b >= 0) { [PKEYS[a], PKEYS[b]] = [PKEYS[b], PKEYS[a]]; } }
 // 剪影／縮圖的紙底與形狀色改跟著主題（淺色＝米紙、深色＝灰卡紙）— 用 TH.thumbPaper / TH.silTone
 
-// 單色剪影縮圖（未填神秘感：看得到形、藏住顏色）
-function drawSilhouette(canvas, pattern, S) {
+// 線稿縮圖（描出每塊輪廓，辨識度遠高於實心剪影；描線色跟主題 silTone 走）
+function drawLineart(canvas, pattern, S) {
   canvas.width = S * 2; canvas.height = S * 2;
   canvas.style.width = S + 'px'; canvas.style.height = S + 'px';
   const x = canvas.getContext('2d'); x.setTransform(1,0,0,1,0,0); x.scale(2, 2);
@@ -1601,12 +1654,12 @@ function drawSilhouette(canvas, pattern, S) {
   x.fillStyle = TH.thumbPaper; x.fillRect(0, 0, S, S);
   x.save(); x.globalAlpha = 0.5; x.drawImage(fiberTexFor(themeKey), 0, 0, W, H, 0, 0, S, S); x.restore();
   x.save(); x.scale(S / W, S / W);
-  x.fillStyle = TH.silTone; x.strokeStyle = TH.silTone; x.lineCap = 'round'; x.lineJoin = 'round';
+  x.strokeStyle = TH.silTone; x.lineCap = 'round'; x.lineJoin = 'round';
   pattern.regions.forEach(r => {
-    if (r.bg) return;                        // 背景不進剪影：選圖縮圖維持物件外型
-    if (r.p2d) { if (r.stroke) { x.lineWidth = r.lw || 9; x.stroke(r.p2d); } else x.fill(r.p2d, r.fillRule); }
-    else if (r.stroke) { x.lineWidth = r.lw || 9; r.shape(x); x.stroke(); }
-    else { r.shape(x); x.fill(); }
+    if (r.bg) return;                        // 背景不畫：縮圖維持物件外型
+    x.lineWidth = r.stroke ? (r.lw || 9) : 7;   // 描線型沿用原線寬；填色型一律描成 7px 輪廓
+    if (r.p2d) { x.stroke(r.p2d); }
+    else { r.shape(x); x.stroke(); }
     x.beginPath();
   });
   x.restore();
@@ -1615,7 +1668,7 @@ function drawSilhouette(canvas, pattern, S) {
 // 已完成的卡：畫出你存下的真實快照（從 localStorage 的 dataURL）
 function drawSavedThumb(canvas, dataUrl, S) {
   canvas.width = S * 2; canvas.height = S * 2;
-  canvas.style.width = S + 'px'; canvas.style.height = S + 'px';
+  canvas.style.width = '100%'; canvas.style.height = 'auto';   // 收藏卡填滿卡寬（卡片 padding:0）
   const x = canvas.getContext('2d');
   x.fillStyle = TH.thumbPaper; x.fillRect(0, 0, S * 2, S * 2);
   const im = new Image();
@@ -1647,14 +1700,11 @@ function buildGrid() {
   PKEYS.forEach(key => {
     const p = PATTERNS[key];
     if (activeCat !== '全部' && p.tag !== activeCat) return;
-    const done = isDone(key);
     const card = document.createElement('button');
-    card.className = 'galCard' + (done ? ' done' : ''); card.dataset.key = key;
+    card.className = 'galCard'; card.dataset.key = key;
     const cv = document.createElement('canvas');
-    if (done) drawSavedThumb(cv, COMPLETED[key].thumb, 150);
-    else drawSilhouette(cv, p, 150);
+    drawLineart(cv, p, 150);
     const nm = document.createElement('div'); nm.className = 'gcName'; nm.textContent = p.name;
-    if (done) { const dot = document.createElement('i'); dot.className = 'gcDot'; nm.appendChild(dot); }
     const tg = document.createElement('div'); tg.className = 'gcTag'; tg.textContent = p.en + ' · ' + p.tag;
     card.appendChild(cv); card.appendChild(nm); card.appendChild(tg);
     card.addEventListener('click', () => showFocus(key));
@@ -1668,23 +1718,18 @@ document.getElementById('heroRandom').addEventListener('click', () => {
   showFocus(PKEYS[Math.floor(Math.random() * PKEYS.length)]);
 });
 
-// ── 單張聚焦 ──
+// ── 確定頁（單張聚焦）──
 const focCanvas = document.getElementById('focCanvas');
 const focName = document.getElementById('focName');
 const focTag = document.getElementById('focTag');
-const focDots = document.getElementById('focDots');
 const focTilt = document.getElementById('focTilt');
 let focIdx = 0;
-PKEYS.forEach(() => { focDots.appendChild(document.createElement('i')); });
 
 function renderFocus() {
-  const key = PKEYS[focIdx], p = PATTERNS[key], done = isDone(key);
-  if (done) drawSavedThumb(focCanvas, COMPLETED[key].thumb, 300);
-  else drawSilhouette(focCanvas, p, 300);
+  const key = PKEYS[focIdx], p = PATTERNS[key];
+  drawLineart(focCanvas, p, 300);
   focName.textContent = p.name;
-  focTag.textContent = done ? (p.en + ' · 已收藏') : (p.en + ' · ' + p.tag);
-  const fs = document.getElementById('focStart'); if (fs) fs.textContent = done ? '再畫一遍' : '開始這一幅';
-  [...focDots.children].forEach((d, i) => d.classList.toggle('on', i === focIdx));
+  focTag.textContent = p.en + ' · ' + p.tag;
 }
 function showFocus(key) {
   focIdx = PKEYS.indexOf(key);
@@ -1697,12 +1742,14 @@ document.getElementById('focNext').addEventListener('click', () => { focIdx = (f
 document.getElementById('focShuffle').addEventListener('click', () => { focIdx = Math.floor(Math.random() * PKEYS.length); renderFocus(); });
 document.getElementById('focBack').addEventListener('click', () => { focusEl.classList.remove('show'); gallery.classList.add('show'); });
 
-// 開始這一幅（順便請求傾斜權限）
-document.getElementById('focStart').addEventListener('click', async () => {
+// 開始這一幅（順便請求傾斜權限）；確定頁點圖片本身也＝開始
+async function startFromFocus() {
   const ok = await requestTilt();
   focTilt.textContent = ok ? '' : '此裝置不支援傾斜，將用方向鍵／預設重力';
   startPattern(PKEYS[focIdx]);
-});
+}
+document.getElementById('focStart').addEventListener('click', startFromFocus);
+document.getElementById('focBig').addEventListener('click', startFromFocus);
 
 // ── 遊玩工具面板（齒輪）──
 const toolPanel = document.getElementById('toolPanel');
@@ -1738,12 +1785,58 @@ document.getElementById('panelTheme').querySelectorAll('.segBtn').forEach(b => {
   b.addEventListener('click', () => applyTheme(b.dataset.theme));
 });
 
-// 清除已完成紀錄（收藏）— 在畫廊頁操作
-document.getElementById('clearRecBtnG').addEventListener('click', () => {
-  if (!Object.keys(COMPLETED).length) { alert('目前沒有已完成的紀錄'); return; }
-  if (!confirm('確定清除所有已完成紀錄嗎？此動作無法復原。')) return;
-  COMPLETED = {}; saveCompleted();
-  if (typeof buildGrid === 'function') buildGrid();   // 畫廊的滿彩卡會變回剪影
+// ── 收藏（展示）頁：相簿牆＋編輯模式批次刪 ──
+const albumEl = document.getElementById('album');
+const albGrid = document.getElementById('albGrid');
+const albEmpty = document.getElementById('albEmpty');
+const albSelN = document.getElementById('albSelN');
+const albEditBtn = document.getElementById('albEdit');
+let albSel = {};
+function updateAlbSel() { albSelN.textContent = Object.keys(albSel).filter(k => albSel[k]).length; }
+function buildAlbum() {
+  albGrid.innerHTML = '';
+  const items = ALBUM.slice().sort((a, b) => b.at - a.at);   // 最新完成在前
+  albEmpty.style.display = items.length ? 'none' : 'block';
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'albCard' + (albSel[item.id] ? ' sel' : '');
+    card.dataset.id = item.id;
+    const cv = document.createElement('canvas');
+    drawSavedThumb(cv, item.thumb, 150);
+    card.appendChild(cv);
+    const chk = document.createElement('span'); chk.className = 'chk';
+    chk.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
+    card.appendChild(chk);
+    card.addEventListener('click', () => {
+      if (!albumEl.classList.contains('editing')) return;   // 非編輯：純展示
+      albSel[item.id] = !albSel[item.id];
+      card.classList.toggle('sel', !!albSel[item.id]);
+      updateAlbSel();
+    });
+    albGrid.appendChild(card);
+  });
+}
+function openAlbum() {
+  albumEl.classList.remove('editing'); albEditBtn.textContent = '編輯'; albSel = {};
+  buildAlbum();
+  gallery.classList.remove('show'); albumEl.classList.add('show');
+}
+document.getElementById('albumBtn').addEventListener('click', openAlbum);
+document.getElementById('albBack').addEventListener('click', () => {
+  albumEl.classList.remove('show'); gallery.classList.add('show');
+});
+albEditBtn.addEventListener('click', () => {
+  const on = !albumEl.classList.contains('editing');
+  albumEl.classList.toggle('editing', on);
+  albEditBtn.textContent = on ? '完成' : '編輯';
+  albSel = {}; buildAlbum(); updateAlbSel();
+});
+document.getElementById('albDel').addEventListener('click', () => {
+  const ids = Object.keys(albSel).filter(k => albSel[k]);
+  if (!ids.length) return;
+  if (!confirm('刪除所選的 ' + ids.length + ' 張作品嗎？此動作無法復原。')) return;
+  ALBUM = ALBUM.filter(x => !albSel[x.id]); saveAlbum();
+  albSel = {}; buildAlbum(); updateAlbSel();
 });
 
 // 重製這一幅（遊玩中）— 清掉目前的沙、重新開始填同一幅
@@ -1757,6 +1850,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 // 開始一個圖案
 function startPattern(key) {
   Sound.init(); Sound.slideOff();   // 切換圖案時重置滑沙聲
+  sessionEntryId = null;            // 新的一場：完成時會存成新一筆收藏（再玩可重複收藏）
   currentKey = key;
   layers = new LayerManager(PATTERNS[key]);
   armedRegion = 0;                  // 換圖案時清掉待撕標記
@@ -1775,17 +1869,15 @@ function startPattern(key) {
 // 回到畫廊
 function showPicker() {
   Sound.slideOff();
-  // 離開一幅已完成的作品時，用「當下更滿的版本」覆蓋存檔的縮圖
-  if (won && currentKey) {
-    const at = (COMPLETED[currentKey] && COMPLETED[currentKey].at) || Date.now();
-    COMPLETED[currentKey] = { thumb: captureSnapshot(), at };
-    saveCompleted();
+  // 離開一幅已完成的作品時，用「當下更滿的版本」更新本場那一筆收藏（同場不另存新筆）
+  if (won && currentKey && sessionEntryId) {
+    const e = ALBUM.find(x => x.id === sessionEntryId);
+    if (e) { e.thumb = captureSnapshot(); saveAlbum(); }
   }
   focusEl.classList.remove('show');
   gallery.classList.add('show');
   winBanner.classList.remove('show');
   appEl.classList.add('picking');
-  buildGrid();   // 重建：剛完成的那張卡會從剪影變成滿彩快照
 }
 
 // 完成揭曉：微光掃過一次 + 襯線小字，三秒后淡出
@@ -1817,7 +1909,7 @@ function loop() {
     progressBar.style.width = (r * 100).toFixed(0) + '%';
     if (!won && layers.allPeeled() && r >= WIN_RATIO) {
       won = true;
-      if (currentKey) { COMPLETED[currentKey] = { thumb: captureSnapshot(), at: Date.now() }; saveCompleted(); }
+      if (currentKey) { sessionEntryId = genId(); ALBUM.push({ id: sessionEntryId, key: currentKey, thumb: captureSnapshot(), at: Date.now() }); saveAlbum(); }
       Sound.ding();   // 完成音；滑沙聲交給主迴圈依沙動續播，不強制切斷
       playReveal();
     }
