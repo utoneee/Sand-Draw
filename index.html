@@ -489,8 +489,8 @@
     <div class="pourWrap gameUi">
       <span class="pourLbl">落沙</span>
       <div class="seg" id="pourSeg">
-        <button class="segBtn sel" data-pour="center" title="從中央倒沙">中</button>
         <button class="segBtn" data-pour="bl" title="從左下倒沙">左下</button>
+        <button class="segBtn sel" data-pour="center" title="從中央倒沙">中</button>
         <button class="segBtn" data-pour="tr" title="從右上倒沙">右上</button>
       </div>
     </div>
@@ -505,6 +505,7 @@
     <button id="updateBtn" class="iconBtn" title="檢查更新" aria-label="檢查更新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg></button>
     <button id="themeBtnG" class="iconBtn" title="切換深灰／淨白" aria-label="切換深灰／淨白"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M5.6 18.4l.7-.7M17.7 6.3l.7-.7"/></svg></button>
     <button id="layoutBtn" class="iconBtn" title="切換平板／手機介面" aria-label="切換平板／手機介面"></button>
+    <button id="albumBtn" class="iconBtn" title="收藏" aria-label="收藏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-9.4-9A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 9.4 5c-2.4 4.4-9.4 9-9.4 9z"/></svg></button>
   </div>
   <div class="galScroll">
     <div class="galHead">
@@ -513,7 +514,6 @@
         <h2 class="brand">沙畫</h2>
         <div class="heroBtns">
           <button class="circBtn" id="heroRandom" title="隨機一幅" aria-label="隨機一幅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01"/><path d="M8.5 14.5a4 4 0 0 0 7 0"/></svg></button>
-          <button class="circBtn" id="albumBtn" title="收藏" aria-label="收藏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-9.4-9A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 9.4 5c-2.4 4.4-9.4 9-9.4 9z"/></svg></button>
         </div>
       </div>
     </div>
@@ -577,7 +577,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v53';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v54';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 450;        // 單次倒沙量（1300/450≈3，倒滿上限約需3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -590,7 +590,7 @@ const MAX_SPEED = 7.5;
 const SPEED_FAST = 2.2;          // 「快」速度倍率（手機畫面小、視覺偏慢時切此檔）；乘在加速度與速度上限
 const SPEED_KEY = 'sandplay.speed';
 let speedMult = (() => { try { return localStorage.getItem(SPEED_KEY) === 'fast' ? SPEED_FAST : 1; } catch (e) { return 1; } })();
-const POUR_POS = { center: [W / 2, H / 2], bl: [72, 414], tr: [408, 66] };   // 落沙點：中央 / 左下角（更靠左壓低）/ 右上角（tr 為 bl 的鏡射）
+const POUR_POS = { center: [W / 2, H / 2], bl: [50, 414], tr: [430, 66] };   // 落沙點：中央 / 左下角（貼近左邊界）/ 右上角（tr 為 bl 的鏡射、貼近右邊界）
 const POUR_KEY = 'sandplay.pour';
 let pourKey = (() => { try { return POUR_POS[localStorage.getItem(POUR_KEY)] ? localStorage.getItem(POUR_KEY) : 'center'; } catch (e) { return 'center'; } })();
 const BASE_GRAVITY = 0.32;       // 永遠存在的微量向下重力（給「下方」的實體感）
