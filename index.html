@@ -310,6 +310,9 @@
   .segBtn svg { width: 18px; height: 18px; }
   .segBtn svg polygon, .segBtn svg rect { fill: color-mix(in srgb, var(--accent) 26%, transparent); stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
   .segBtn.sel { color: var(--onFrame); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .pourWrap { margin: 2px 0 4px; }
+  .pourLbl { display: block; font-size: 10.5px; color: var(--muted); letter-spacing: 1px; margin-bottom: 5px; text-align: center; }
+  #pourSeg .segBtn { padding: 6px 0; font-size: 11.5px; }
   .sizeRow { display: flex; align-items: center; gap: 11px; }
   .sizeRow .cap { font-size: 10.5px; color: var(--muted); flex: 0 0 auto; }
   #sizeRange { flex: 1; -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px; background: var(--lineTrack); }
@@ -470,6 +473,13 @@
       <div class="rail gameUi">
         <div id="colorTabs"></div>
         <div id="colorRow"></div>
+        <div class="pourWrap gameUi">
+          <span class="pourLbl">落沙</span>
+          <div class="seg" id="pourSeg">
+            <button class="segBtn sel" data-pour="center" title="從中央倒沙">中</button>
+            <button class="segBtn" data-pour="bl" title="從左下倒沙">左下</button>
+          </div>
+        </div>
         <div class="tools">
           <button id="peelBtn" class="iconBtn" title="撕下選中的貼紙" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>撕下</button>
           <button id="dumpBtn" class="iconBtn" title="倒掉散沙"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.55a8 8 0 0 0-6 14.9m0-4.45v5h-5"/></svg>清沙</button>
@@ -561,7 +571,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v50';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v51';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 450;        // 單次倒沙量（1300/450≈3，倒滿上限約需3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -574,6 +584,9 @@ const MAX_SPEED = 7.5;
 const SPEED_FAST = 2.2;          // 「快」速度倍率（手機畫面小、視覺偏慢時切此檔）；乘在加速度與速度上限
 const SPEED_KEY = 'sandplay.speed';
 let speedMult = (() => { try { return localStorage.getItem(SPEED_KEY) === 'fast' ? SPEED_FAST : 1; } catch (e) { return 1; } })();
+const POUR_POS = { center: [W / 2, H / 2], bl: [104, 376] };   // 落沙點：中央 / 左下角（左下離牆夠遠、撒沙叢不貼邊）
+const POUR_KEY = 'sandplay.pour';
+let pourKey = (() => { try { return POUR_POS[localStorage.getItem(POUR_KEY)] ? localStorage.getItem(POUR_KEY) : 'center'; } catch (e) { return 'center'; } })();
 const BASE_GRAVITY = 0.32;       // 永遠存在的微量向下重力（給「下方」的實體感）
 const REST_SPEED = 0.24;         // 低於此速度就視為靜止（提高＝更快停、減少緩慢漂移）
 const SLEEP_EPS = 0.4;           // 一幀淨位移小於此 → 視為沒動
@@ -1314,11 +1327,12 @@ class ParticleSystem {
   constructor() { this.list = []; }
   scoop(color, n) {
     let added = 0;
+    const [px, py] = POUR_POS[pourKey] || POUR_POS.center;   // 依目前落沙點決定湧沙位置
     for (let i = 0; i < n && this.list.length < MAX_PARTICLES; i++) {
       const a = Math.random() * 7, rr = Math.random() * 48;
       this.list.push({
-        x: W / 2 + Math.cos(a) * rr,
-        y: H / 2 + Math.sin(a) * rr,
+        x: px + Math.cos(a) * rr,
+        y: py + Math.sin(a) * rr,
         vx: (Math.random() - 0.5) * 0.4,
         vy: (Math.random() - 0.5) * 0.4,
         r: (3 + Math.random() * 2) * SAND_SIZE,
@@ -2030,6 +2044,18 @@ function applySpeed(mode) {
 speedSeg.querySelectorAll('.segBtn').forEach(b => b.addEventListener('click', () => applySpeed(b.dataset.speed)));
 applySpeed(speedMult === SPEED_FAST ? 'fast' : 'normal');   // 開機同步面板選中態
 
+// 落沙點（色票下方）：中央 / 左下，記憶於 localStorage；切換時盤面閃現落沙位置標記
+const pourSeg = document.getElementById('pourSeg');
+let pourMarkT = 0;   // 標記顯示的起始時間戳（0＝不顯示）；只在切換時設定
+function applyPour(key, flash) {
+  pourKey = POUR_POS[key] ? key : 'center';
+  try { localStorage.setItem(POUR_KEY, pourKey); } catch (e) {}
+  pourSeg.querySelectorAll('.segBtn').forEach(b => b.classList.toggle('sel', b.dataset.pour === pourKey));
+  if (flash) pourMarkT = performance.now();
+}
+pourSeg.querySelectorAll('.segBtn').forEach(b => b.addEventListener('click', () => applyPour(b.dataset.pour, true)));
+applyPour(pourKey, false);   // 開機同步選中態（不閃標記）
+
 // ── 收藏（展示）頁：相簿牆＋編輯模式批次刪 ──
 const albumEl = document.getElementById('album');
 const albGrid = document.getElementById('albGrid');
@@ -2149,6 +2175,20 @@ function loop() {
   }
   mainCtx.clearRect(0, 0, W, H);
   particles.draw(mainCtx);
+  // 落沙點標記：只在切換後短暫閃現（約 1.2 秒淡出），提示下一杓從哪出
+  if (pourMarkT) {
+    const el = performance.now() - pourMarkT, dur = 1200;
+    if (el >= dur) pourMarkT = 0;
+    else {
+      const a = 1 - el / dur, [mx, my] = POUR_POS[pourKey] || POUR_POS.center;
+      const ac = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#A9744F';
+      mainCtx.save();
+      mainCtx.globalAlpha = a * 0.85; mainCtx.strokeStyle = ac; mainCtx.fillStyle = ac; mainCtx.lineWidth = 2.5;
+      mainCtx.beginPath(); mainCtx.arc(mx, my, 16, 0, 7); mainCtx.stroke();
+      mainCtx.beginPath(); mainCtx.arc(mx, my, 3.5, 0, 7); mainCtx.fill();
+      mainCtx.restore();
+    }
+  }
   if (layers) {
     const r = layers.ratio();
     progressBar.style.width = (r * 100).toFixed(0) + '%';
