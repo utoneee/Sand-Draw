@@ -1,5 +1,5 @@
 // 網路優先：有網路就拿最新版，離線才用快取
-const CACHE = 'sandplay-v2';
+const CACHE = 'sandplay-v3';
 const PRECACHE = ['./index.html', './manifest.json', './icon2.png'];
 
 self.addEventListener('install', e => {
@@ -17,6 +17,7 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
   if (e.request.mode === 'navigate') {
     // 導覽請求：網路優先，失敗才用快取
     e.respondWith(
@@ -27,6 +28,17 @@ self.addEventListener('fetch', e => {
           return r;
         })
         .catch(() => caches.match(e.request))
+    );
+  } else if (url.origin === location.origin &&
+             (url.pathname.endsWith('/manifest.json') || url.pathname.endsWith('/icon2.png'))) {
+    // v55: 靜態小檔改快取優先＋背景更新——原本只攔導覽，離線時圖示/manifest 拿不到
+    e.respondWith(
+      caches.match(e.request).then(hit => {
+        const net = fetch(e.request)
+          .then(r => { const clone = r.clone(); caches.open(CACHE).then(c => c.put(e.request, clone)); return r; })
+          .catch(() => hit);
+        return hit || net;
+      })
     );
   }
 });

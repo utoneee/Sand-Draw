@@ -353,9 +353,16 @@
   .albEditBtn { font-family: inherit; font-size: 12px; color: var(--onFrame); cursor: pointer; margin-left: auto;
     background: none; border: 1px solid var(--btnBd); padding: 7px 14px; border-radius: 15px; }
   .albBar { display: none; align-items: center; justify-content: space-between; padding: 0 22px 6px;
-    font-size: 13px; color: var(--muted); }
+    font-size: 13px; color: var(--muted); flex-wrap: wrap; gap: 6px 10px; }   /* wrap: 窄手機時動作列換行不溢出 */
   #album.editing .albBar { display: flex; }
   .albBar b { color: var(--onFrame); }
+  .albActs { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  .albDelTog { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; }
+  .albDelTog input { accent-color: var(--accent); width: 14px; height: 14px; margin: 0; cursor: pointer; }
+  .albExp { font-family: inherit; font-size: 13px; cursor: pointer; padding: 6px 15px; border-radius: 15px;
+    background: transparent; border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent); color: var(--accent);
+    display: inline-flex; align-items: center; gap: 5px; }
+  .albExp svg { width: 13px; height: 15px; }
   .albDel { font-family: inherit; font-size: 13px; cursor: pointer; padding: 6px 15px; border-radius: 15px;
     background: transparent; border: 1px solid color-mix(in srgb, #d8694f 60%, transparent); color: #e0907e; }
   .albEmpty { display: none; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.9; padding: 60px 20px; }
@@ -371,6 +378,14 @@
   .albCard .chk svg { width: 15px; height: 15px; }
   .albCard.sel { border-color: var(--accent); }
   .albCard.sel .chk { background: var(--accent); border-color: var(--accent); color: #2a2017; }
+
+  /* ── 輕量提示 toast（收藏滿/匯出回饋；點不到、自動淡出）── */
+  #toast { position: fixed; left: 50%; bottom: 9%; transform: translateX(-50%) translateY(8px); z-index: 300;
+    background: var(--card); color: var(--onFrame); border: 1px solid var(--bd);
+    font-size: 13px; letter-spacing: 1px; padding: 10px 18px; border-radius: 20px;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease;
+    max-width: 82vw; text-align: center; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* ── 收藏放大燈箱：點圖卡全螢幕、點任意處關閉 ── */
   #lightbox { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center;
@@ -557,7 +572,11 @@
   </div>
   <div id="albBar" class="albBar">
     <span>已選 <b id="albSelN">0</b> 張</span>
-    <button id="albDel" class="albDel">刪除所選</button>
+    <div class="albActs">
+      <label class="albDelTog"><input type="checkbox" id="albDelAfter">匯出後刪除</label>
+      <button id="albExp" class="albExp"><svg viewBox="0 0 14 17" fill="none"><path d="M4 7H3.5A1.5 1.5 0 0 0 2 8.5V14a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 12 14V8.5A1.5 1.5 0 0 0 10.5 7H10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M7 10V1.5M4.5 4L7 1.5L9.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>匯出</button>
+      <button id="albDel" class="albDel">刪除所選</button>
+    </div>
   </div>
   <div class="galScroll">
     <div id="albGrid" class="galGrid"></div>
@@ -568,6 +587,9 @@
 <!-- 收藏放大：點圖卡全螢幕檢視，點任意處關閉 -->
 <div id="lightbox"><img id="lightboxImg" alt="收藏作品"></div>
 
+<!-- 輕量提示（收藏空間滿、匯出結果回饋） -->
+<div id="toast"></div>
+
 <script>
 "use strict";
 (() => {
@@ -577,11 +599,15 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v54';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v55';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 450;        // 單次倒沙量（1300/450≈3，倒滿上限約需3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
 const MIX_THRESH = 90;           // 判定「不同色」門檻（曼哈頓色差）：低於此視為同色不混。要高於「同色顆粒明暗差」否則單色區會冒暗雜質點
+// v55: 黏沙混色改查 CPU 顏色緩衝（記每像素實心底圓的 base 色）。原本逐顆 stuckCtx.getImageData(1px)
+//      會強制 GPU→CPU 同步、卡整條渲染管線——滑沙讓大量沙同時黏住的幀就是頓點來源。也是日後 A2 對稱混色的地基。
+const stuckSet  = new Uint8Array(W * H);        // 0=該處無已黏的沙
+const stuckBase = new Uint8Array(W * H * 3);    // 該處沙的 base RGB
 const PACK = 0.68;               // 分離目標距離倍率（<1＝容許重疊、擠成沙堆而非排排站）
 const STICK_CHANCE = 0.85;        // 黏贴機率（越高＝沙黏得越快、剩沙少→不易混色溢出）
 const ACCEL = 1.1;               // 重力加速係數（提高＝沙落得更乾脆，不慢飄）
@@ -1404,8 +1430,9 @@ class ParticleSystem {
         // B 沙混色（減法風格 RGB 相乘）：探落點底下是否已有「別色」舊沙 →
         //   底色 × 新色算出混色實心畫（不再用半透明）；空白底/同色維持純新色（純色區乾淨）。
         let _baseRGB = _sh.base, _grainHex = s.c;
-        const _px = stuckCtx.getImageData(s.x | 0, s.y | 0, 1, 1).data;
-        if (_px[3] > 40) {
+        const _bp = (s.y | 0) * W + (s.x | 0);   // v55: 查 CPU 緩衝取底色，取代 getImageData 逐顆回讀（滑沙頓的主因）
+        if (stuckSet[_bp]) {
+          const _px = [stuckBase[_bp * 3], stuckBase[_bp * 3 + 1], stuckBase[_bp * 3 + 2]];
           const _d = Math.abs(_px[0] - _sh.base[0]) + Math.abs(_px[1] - _sh.base[1]) + Math.abs(_px[2] - _sh.base[2]);
           const _nl = 0.299 * _sh.base[0] + 0.587 * _sh.base[1] + 0.114 * _sh.base[2];
           // 不同色才混；只有「近純白」跳過（相乘下白＝單位元會被底色吃掉）。
@@ -1426,6 +1453,17 @@ class ParticleSystem {
         }
         stuckCtx.fillStyle = rgbStr(_baseRGB);
         stuckCtx.beginPath(); stuckCtx.arc(s.x, s.y, s.r * 0.95, 0, 7); stuckCtx.fill();
+        {   // 寫回顏色緩衝：實心底圓範圍記 base 色（半徑僅 1~2px，迴圈極小）
+          const rr = s.r * 0.95, r2c = rr * rr;
+          const x0 = Math.max(0, (s.x - rr) | 0), x1 = Math.min(W - 1, (s.x + rr) | 0);
+          const y0 = Math.max(0, (s.y - rr) | 0), y1 = Math.min(H - 1, (s.y + rr) | 0);
+          for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) {
+            const dx = xx - s.x, dy = yy - s.y;
+            if (dx * dx + dy * dy > r2c) continue;
+            const p = yy * W + xx; stuckSet[p] = 1;
+            stuckBase[p * 3] = _baseRGB[0]; stuckBase[p * 3 + 1] = _baseRGB[1]; stuckBase[p * 3 + 2] = _baseRGB[2];
+          }
+        }
         paintGrain(stuckCtx, s.x, s.y, s.r, _grainHex);
         for (let k = 0; k < 3; k++) {
           const a = Math.random() * 6.283, d = s.r * (0.25 + Math.random() * 0.45);
@@ -1724,7 +1762,16 @@ const OLD_KEY  = 'sandplay.completed.v1';   // 舊版「每幅一格」格式，
 let ALBUM = [];
 let sessionEntryId = null;                  // 本場完成所對應的那一筆（同場更新、再玩才算新一筆）
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
-function saveAlbum() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(ALBUM)); } catch (e) {} }
+// 輕量提示（防爆/匯出回饋用）：計時器掛在函式屬性上，避免 let 宣告順序造成 TDZ
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 2600);
+}
+function saveAlbum() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(ALBUM)); return true; }
+  catch (e) { toast('收藏空間已滿：請到收藏頁匯出圖檔後，刪除舊作品騰出空間'); return false; }   // v55: 原本無聲吞掉，用戶不知收藏沒存成
+}
 (function loadAlbum() {
   let cur = null;
   try { cur = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
@@ -1741,7 +1788,7 @@ function saveAlbum() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(ALBUM
 // 把沙盤合成一張，存成你「親手上色那一幅」的真實快照
 // 只拍已點定的作品（托盤＋貼紙板＋黏住的沙），不拍還在落的浮沙 → 與落沙時機無關
 function captureSnapshot() {
-  const s = 300, c = document.createElement('canvas'); c.width = s; c.height = s;
+  const s = 600, c = document.createElement('canvas'); c.width = s; c.height = s;   // v55: 300→600，匯出圖檔品質夠用（容量約4倍，收藏上限約70張，配合匯出+清理流程）
   const x = c.getContext('2d');
   // 乾淨米紙為底（與畫廓剪影卡同調）——沒填的背景不記錄，只留下你真正倒的沙
   x.fillStyle = TH.thumbPaper; x.fillRect(0, 0, s, s);
@@ -2115,6 +2162,54 @@ document.getElementById('albDel').addEventListener('click', () => {
   ALBUM = ALBUM.filter(x => !albSel[x.id]); saveAlbum();
   albSel = {}; buildAlbum(); updateAlbSel();
 });
+// ⬆ 匯出所選作品為 .jpg：iPad/iPhone 走系統分享面板（可存進照片），電腦直接下載。
+// 「匯出後刪除」預設關；分享面板被取消（AbortError）視為沒匯出成功 → 不刪，防誤刪。
+const albDelAfter = document.getElementById('albDelAfter');
+const EXPDEL_KEY = 'sandplay.expdel';
+try { albDelAfter.checked = localStorage.getItem(EXPDEL_KEY) === '1'; } catch (e) {}
+albDelAfter.addEventListener('change', () => { try { localStorage.setItem(EXPDEL_KEY, albDelAfter.checked ? '1' : '0'); } catch (e) {} });
+function dataUrlToBlob(u) {
+  const i = u.indexOf(','), mime = (u.slice(0, i).match(/data:(.*?)[;,]/) || [])[1] || 'image/jpeg';
+  const bin = atob(u.slice(i + 1)), a = new Uint8Array(bin.length);
+  for (let k = 0; k < bin.length; k++) a[k] = bin.charCodeAt(k);
+  return new Blob([a], { type: mime });
+}
+document.getElementById('albExp').addEventListener('click', async () => {
+  const ids = Object.keys(albSel).filter(k => albSel[k]);
+  if (!ids.length) { toast('先勾選要匯出的作品'); return; }
+  const items = ALBUM.filter(x => albSel[x.id]);
+  const files = items.map(it => {
+    const p = PATTERNS[it.key], d = new Date(it.at);
+    const name = '沙畫-' + (p ? p.name : it.key) + '-' +
+      d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') +
+      '-' + it.id.slice(-4) + '.jpg';
+    return new File([dataUrlToBlob(it.thumb)], name, { type: 'image/jpeg' });
+  });
+  let ok = false;
+  // 只有觸控裝置走分享面板（iPad/iPhone 可存進照片）；桌面 Edge/Chrome 的 canShare 也會 true，
+  // 但 Windows 分享面板沒有「存檔」、且常直接拒絕 → 桌面一律直接下載
+  const touchDev = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (touchDev && navigator.canShare && navigator.canShare({ files })) {
+    try { await navigator.share({ files }); ok = true; } catch (e) {}   // 取消分享＝不算匯出
+  } else {
+    // 桌面 fallback：逐張觸發下載（錯開時間；瀏覽器對多檔下載可能跳一次允許詢問）
+    files.forEach((f, i) => setTimeout(() => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(f); a.download = f.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }, i * 400));
+    ok = true;
+  }
+  if (!ok) return;
+  if (albDelAfter.checked) {
+    ALBUM = ALBUM.filter(x => !albSel[x.id]); saveAlbum();
+    albSel = {}; buildAlbum(); updateAlbSel();
+    toast('已匯出並刪除 ' + ids.length + ' 張');
+  } else {
+    toast('已匯出 ' + ids.length + ' 張');
+  }
+});
 
 // 重製這一幅（遊玩中）— 清掉目前的沙、重新開始填同一幅
 document.getElementById('resetBtn').addEventListener('click', () => {
@@ -2133,6 +2228,7 @@ function startPattern(key) {
   armedRegion = 0;                  // 換圖案時清掉待撕標記
   particles.clear();
   stuckCtx.clearRect(0, 0, W, H);
+  stuckSet.fill(0);                 // v55: 同步清掉混色查表緩衝（stuckBase 由 stuckSet 把關，不必清）
   mainCtx.clearRect(0, 0, W, H);
   drawBoard();
   won = false;
@@ -2141,11 +2237,14 @@ function startPattern(key) {
   focusEl.classList.remove('show');
   appEl.classList.remove('picking');
   document.getElementById('progressBar').style.width = '0%';
+  ensureLoop();                     // v55: 迴圈可能在選圖頁暫停了，開始遊玩時喚醒
 }
 
 // 回到畫廊
 function showPicker() {
   Sound.slideOff();
+  particles.clear();   // v55: 回選圖頁後無路徑回到同一場（只能 startPattern 重開），清散沙讓主迴圈能暫停省電
+  mainCtx.clearRect(0, 0, W, H);   // 迴圈暫停後不會再重繪，主動清掉浮沙殘影（選圖頁遮罩半透明，會隱約透出）
   // 離開一幅已完成的作品時，用「當下更滿的版本」更新本場那一筆收藏（同場不另存新筆）
   if (won && currentKey && sessionEntryId) {
     const e = ALBUM.find(x => x.id === sessionEntryId);
@@ -2168,7 +2267,11 @@ function playReveal() {
 
 // 主迴圈
 const progressBar = document.getElementById('progressBar');
+let loopOn = false;   // v55: 選圖/收藏頁且沙全靜止（或無沙）→ 暫停 rAF 省電；startPattern 會喚醒
 function loop() {
+  if (appEl.classList.contains('picking') && !particles.list.some(s => !s.sleep)) {
+    loopOn = false; Sound.slideOff(); return;
+  }
   const g = input.gravity();
   particles.step(g.x, g.y, layers, stuckCtx);
   // 滑沙聲（顆粒合成）：依「實際移動的沙量」灑沙粒；回畫廊（picking）時不發聲
@@ -2207,7 +2310,8 @@ function loop() {
   }
   requestAnimationFrame(loop);
 }
-loop();
+function ensureLoop() { if (!loopOn) { loopOn = true; requestAnimationFrame(loop); } }
+ensureLoop();
 
 // 控制鈕
 document.getElementById('dumpBtn').addEventListener('click', () => { particles.clear(); Sound.slideOff(); });
