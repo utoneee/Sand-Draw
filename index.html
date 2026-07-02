@@ -603,7 +603,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v56';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v57';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 450;        // 單次倒沙量（1300/450≈3，倒滿上限約需3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -2254,6 +2254,7 @@ function startPattern(key) {
   appEl.classList.remove('picking');
   document.getElementById('progressBar').style.width = '0%';
   ensureLoop();                     // v55: 迴圈可能在選圖頁暫停了，開始遊玩時喚醒
+  fitDevice();                      // v57: 選圖頁時 .device 隱藏（offsetHeight=0 量不到），進遊玩才算得出縮放
 }
 
 // 回到畫廊
@@ -2412,6 +2413,7 @@ function applyLayout(mode) {
   document.body.classList.toggle('phone', phone);
   if (layoutBtn) layoutBtn.innerHTML = phone ? ICON.tablet : ICON.phone;   // 顯示「切回去」的目標圖示
   fitBoard(); drawBoard();   // 沙盤尺寸變了 → 重新貼合並重繪
+  if (typeof fitDevice === 'function') fitDevice();   // 切回平板模式時重算整體縮放（函式宣告有提升，防禦寫法保險）
 }
 if (layoutBtn) layoutBtn.addEventListener('click', () => {
   const next = document.body.classList.contains('phone') ? 'tablet' : 'phone';
@@ -2440,9 +2442,23 @@ function fitBoard() {
   if (!w) return;
   if (Math.abs(stageEl.clientHeight - w) > 2) stageEl.style.height = w + 'px';
 }
-setTimeout(fitBoard, 150);
-window.addEventListener('resize', fitBoard);
-window.addEventListener('orientationchange', () => setTimeout(fitBoard, 300));
+// v57: 平板橫放整體縮放貼合視窗高。根因＝rail 是固定高（色票 min-height 482 + 撕下/清沙）
+//      加上落沙列，.device 常態高 ~850px；.device 寬度的 88vh 上限只縮得了沙盤、縮不了 rail，
+//      橫放 vh(~740) 裝不下 → 上下被切。解法＝量未縮放高度(offsetHeight 不受 transform 影響)，
+//      超過可用高就對 .device 套 scale 置中縮小；點擊座標走 getBoundingClientRect 會跟著 transform，照常可玩。
+//      手機模式(body.phone)維持 v45 直式行為不縮。
+function fitDevice() {
+  // 元素改函式內查詢：applyLayout 開機呼叫早於此段，模組層 const 會踩 TDZ（v47 _isIOS 同款坑）
+  const dev = document.querySelector('#app > .device');
+  if (!dev) return;
+  if (document.body.classList.contains('phone')) { dev.style.transform = ''; return; }
+  const avail = window.innerHeight - 14;   // 扣 #app 上下 padding（safe-area 預設 8+8 取略小值）
+  const k = Math.min(1, avail / dev.offsetHeight);
+  dev.style.transform = k < 1 ? 'scale(' + k.toFixed(4) + ')' : '';
+}
+setTimeout(() => { fitBoard(); fitDevice(); }, 150);
+window.addEventListener('resize', () => { fitBoard(); fitDevice(); });
+window.addEventListener('orientationchange', () => setTimeout(() => { fitBoard(); fitDevice(); }, 300));
 
 })();
 </script>
