@@ -659,11 +659,22 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v62';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v63';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 450;        // 單次倒沙量（1300/450≈3，倒滿上限約需3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
 const MIX_THRESH = 90;           // 判定「不同色」門檻（曼哈頓色差）：低於此視為同色不混。要高於「同色顆粒明暗差」否則單色區會冒暗雜質點
+const BLEED_R = 5;               // A2 暈染半徑（px）：新沙黏上時，把鄰域內「別色」舊沙朝新色回染。效能紅線：不得超過 6
+const BLEED_T = 0.5;             // A2 暈染強度（圓心處），向邊緣線性衰減至 0。太髒→降這個；沒感覺→先升這個再升 R（headless 對比 R4/T0.35 太含蓄，R5/T0.5 才有可見過渡帶）
+const AVAL_SPEED = 2.5;          // A3 雪崩：滑得比這快的沙才會踢醒下坡的睡沙（平放時沒沙超過此速＝零觸發，守住靜止不抖的紅線）
+const AVAL_CHANCE = 0.15;        // A3 每顆快沙每幀踢醒的機率。「還是很均勻」→升；「像地震全在動」→降
+const AVAL_DIST = 8;             // A3 往重力（下坡）方向探多遠（px）找睡沙
+const AVAL_MAX = 30;             // A3 每幀喚醒上限（安全閥，防連鎖雪崩一幀全醒→_separate 負載尖峰）。別動
+// A3 卡滯（stick-slip）：滑動中的沙小機率被表面摩擦短暫咬住再鬆脫 → 滑沙一波一波（雪崩感的主力；
+// 純「踢醒睡沙」實測空轉——鬆沙傾斜時根本不睡，均勻感來自全體同加速度，靠卡滯打破同步才有效）
+const STALL_CHANCE = 0.04;       // 每幀被咬住的機率（速度 >1 才會觸發＝靜止盤面零觸發）。「還是均勻」→升；「頓頓的」→降
+const STALL_FRAMES = 12;         // 咬住持續幀數（~0.2s）
+const STALL_DAMP = 0.4;          // 咬住期間每幀額外阻尼（越低卡越死）
 // v55: 黏沙混色改查 CPU 顏色緩衝（記每像素實心底圓的 base 色）。原本逐顆 stuckCtx.getImageData(1px)
 //      會強制 GPU→CPU 同步、卡整條渲染管線——滑沙讓大量沙同時黏住的幀就是頓點來源。也是日後 A2 對稱混色的地基。
 const stuckSet  = new Uint8Array(W * H);        // 0=該處無已黏的沙
@@ -1473,11 +1484,13 @@ class ParticleSystem {
     for (const s of this.list) {
       s.ox = s.x; s.oy = s.y;
       if (s.sleep) continue;
+      if (s.stall) { s.stall--; s.vx *= STALL_DAMP; s.vy *= STALL_DAMP; }   // A3 咬住中：額外阻尼壓速
       s.vx = (s.vx + ax) * DAMP;
       s.vy = (s.vy + ay) * DAMP;
       const sp = Math.hypot(s.vx, s.vy);
       if (sp > maxSp) { s.vx = s.vx / sp * maxSp; s.vy = s.vy / sp * maxSp; }
       else if (sp < REST_SPEED) { s.vx = 0; s.vy = 0; }   // 太慢就停，不漂浮
+      if (!s.stall && sp > 1 && Math.abs(gx) > 0.15 && Math.random() < STALL_CHANCE) s.stall = STALL_FRAMES;   // A3 明顯傾斜＋滑動中才咬住（直倒沙不拖慢、效能不吃）
       s.x += s.vx; s.y += s.vy;
       if (s.x < s.r) { s.x = s.r; s.vx = 0; }
       else if (s.x > W - s.r) { s.x = W - s.r; s.vx = 0; }
@@ -1492,6 +1505,31 @@ class ParticleSystem {
       if (moved < SLEEP_EPS) {
         if (!s.sleep && (s.still = (s.still || 0) + 1) >= SLEEP_FRAMES) { s.sleep = true; s.vx = 0; s.vy = 0; }
       } else { s.still = 0; s.sleep = false; }
+    }
+    // 2c. A3 雪崩喚醒：滑得快的沙有機率踢醒「順重力（下坡）方向」不遠處的睡沙 → 傾斜滑沙一波一波像沙丘崩落。
+    //     速度門檻擋掉靜止盤面（平放無快沙＝零觸發，不重演靜止抖動老 bug）；AVAL_MAX 防連鎖雪崩負載尖峰。
+    if (this._grid) {
+      const gmag = Math.hypot(ax, ay);
+      if (gmag > 0.001) {
+        const ux = ax / gmag, uy = ay / gmag;
+        const cs = 11, gkey = (cx, cy) => cx * 100000 + cy;
+        let woken = 0;
+        for (const s of this.list) {
+          if (woken >= AVAL_MAX) break;
+          if (s.sleep) continue;
+          const sp = Math.hypot(s.vx, s.vy);
+          if (sp < AVAL_SPEED || Math.random() > AVAL_CHANCE) continue;
+          const arr = this._grid.get(gkey(((s.x + ux * AVAL_DIST) / cs) | 0, ((s.y + uy * AVAL_DIST) / cs) | 0));
+          if (!arr) continue;
+          for (const j of arr) {
+            const b = this.list[j];
+            if (!b || !b.sleep) continue;
+            b.sleep = false; b.still = 0;
+            b.vx = ux * sp * 0.5; b.vy = uy * sp * 0.5;   // 小初速沿重力方向＝被上游沙帶動
+            if (++woken >= AVAL_MAX) break;
+          }
+        }
+      }
     }
     // 3. 滑過膠水時黏住
     const keep = [];
@@ -1538,6 +1576,28 @@ class ParticleSystem {
             stuckBase[p * 3] = _baseRGB[0]; stuckBase[p * 3 + 1] = _baseRGB[1]; stuckBase[p * 3 + 2] = _baseRGB[2];
           }
         }
+        {   // A2 鄰域回染：實心圓外圈的「別色」舊沙朝新色插值（邊緣衰減）並以 1px 點回畫 → 交界成漸層。
+            // 同色（< MIX_THRESH）跳過＝純色區不自我攪動；圓內像素剛被寫成新色、天然被同色判定略過。
+          const bx = s.x | 0, by = s.y | 0, br2 = BLEED_R * BLEED_R;
+          const bx0 = Math.max(0, bx - BLEED_R), bx1 = Math.min(W - 1, bx + BLEED_R);
+          const by0 = Math.max(0, by - BLEED_R), by1 = Math.min(H - 1, by + BLEED_R);
+          for (let yy = by0; yy <= by1; yy++) for (let xx = bx0; xx <= bx1; xx++) {
+            const p = yy * W + xx;
+            if (!stuckSet[p]) continue;
+            const dx = xx - bx, dy = yy - by, d2 = dx * dx + dy * dy;
+            if (d2 > br2) continue;
+            const pr = p * 3;
+            const df = Math.abs(stuckBase[pr] - _baseRGB[0]) + Math.abs(stuckBase[pr + 1] - _baseRGB[1]) + Math.abs(stuckBase[pr + 2] - _baseRGB[2]);
+            if (df < MIX_THRESH) continue;
+            const t = BLEED_T * (1 - Math.sqrt(d2) / BLEED_R);
+            const nr = clamp8(stuckBase[pr]     + (_baseRGB[0] - stuckBase[pr])     * t);
+            const ng = clamp8(stuckBase[pr + 1] + (_baseRGB[1] - stuckBase[pr + 1]) * t);
+            const nb = clamp8(stuckBase[pr + 2] + (_baseRGB[2] - stuckBase[pr + 2]) * t);
+            stuckBase[pr] = nr; stuckBase[pr + 1] = ng; stuckBase[pr + 2] = nb;
+            stuckCtx.fillStyle = 'rgb(' + nr + ',' + ng + ',' + nb + ')';
+            stuckCtx.fillRect(xx, yy, 1, 1);
+          }
+        }
         paintGrain(stuckCtx, s.x, s.y, s.r, _grainHex);
         for (let k = 0; k < 3; k++) {
           const a = Math.random() * 6.283, d = s.r * (0.25 + Math.random() * 0.45);
@@ -1552,8 +1612,9 @@ class ParticleSystem {
     const cs = 11;
     const key = (cx, cy) => cx * 100000 + cy;
     const L = this.list;
+    let buckets = null;   // 最後一輪的網格外漏給 A3 雪崩喚醒重用（省一次重建）
     for (let iter = 0; iter < SEPARATE_ITERS; iter++) {
-      const buckets = new Map();
+      buckets = new Map();
       for (let i = 0; i < L.length; i++) {
         const cx = (L[i].x / cs) | 0, cy = (L[i].y / cs) | 0;
         const k = key(cx, cy);
@@ -1591,6 +1652,7 @@ class ParticleSystem {
       if (s.x < s.r) s.x = s.r; else if (s.x > W - s.r) s.x = W - s.r;
       if (s.y < s.r) s.y = s.r; else if (s.y > H - s.r) s.y = H - s.r;
     }
+    this._grid = buckets;   // 網格索引對應 this.list（黏沙移除前有效）；A3 在 step() 內、黏沙前使用
   }
   draw(ctx) {
     for (const s of this.list) {
