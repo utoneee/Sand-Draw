@@ -15,3 +15,5 @@ demo.html
 執行extract.bat
 # 圖案來源 SVG 批次資料夾（只存本機，不發布）
 0628*/
+# 里程碑實體備份（保險，实际都放 _archive/）
+*-v*.html
