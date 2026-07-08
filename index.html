@@ -397,6 +397,17 @@
   /* 用 width 撐到目標尺寸（快照原生 300px，不設 width 會只顯示 300px、比展覽卡還小）；高度過高時退回 86vh */
   #lightbox img { width: min(88vw, 86vh, 500px); height: auto; border-radius: 18px;
     box-shadow: 0 30px 70px -20px rgba(0,0,0,.8); image-rendering: auto; }
+  /* v66 相簿瀏覽：兩側箭頭（桌面用；到頭淡出）＋換張滑入動畫（觸控滑/方向鍵/箭頭共用） */
+  #lightbox .lbNav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;
+    font: 34px/1 var(--font-serif, serif); color: rgba(255,255,255,.45); padding: 20px 16px;
+    cursor: pointer; user-select: none; -webkit-user-select: none; transition: color .15s, opacity .2s; }
+  #lightbox .lbNav:hover { color: #fff; }
+  #lightbox .lbNav.off { opacity: 0; pointer-events: none; }
+  #lbPrev { left: 4px; } #lbNext { right: 4px; }
+  @keyframes lbInL { from { transform: translateX(-26px); opacity: .25; } to { transform: none; opacity: 1; } }
+  @keyframes lbInR { from { transform: translateX(26px);  opacity: .25; } to { transform: none; opacity: 1; } }
+  #lightbox img.inL { animation: lbInL .22s ease-out; }
+  #lightbox img.inR { animation: lbInR .22s ease-out; }
 
   /* ── 美術館方向：襯線標題（招牌「沙畫」與題名）── */
   .galHead h2 { font-family: var(--font-serif); font-weight: 600; }
@@ -645,7 +656,7 @@
 </div>
 
 <!-- 收藏放大：點圖卡全螢幕檢視，點任意處關閉 -->
-<div id="lightbox"><img id="lightboxImg" alt="收藏作品"></div>
+<div id="lightbox"><div class="lbNav off" id="lbPrev">‹</div><img id="lightboxImg" alt="收藏作品"><div class="lbNav off" id="lbNext">›</div></div>
 
 <!-- 輕量提示（收藏空間滿、匯出結果回饋） -->
 <div id="toast"></div>
@@ -659,7 +670,7 @@
 // ─────────────────────────────────────────────────────────────
 const W = 480, H = 480;
 const MAX_PARTICLES = 1300;      // 上限提高，容納更大坨的沙
-const BUILD = 'v65';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
+const BUILD = 'v66';   // 版號：每次改完只動這一處（對應 git tag vN-backup），JS 自動同步顯示
 { const el = document.getElementById('ovUpd'); if (el) el.textContent = BUILD; }
 const SCOOP_AMOUNT = 450;        // 單次倒沙量（1300/450≈3，倒滿上限約需3次，中間可換色混色）
 const MIX_STRENGTH = 0.45;       // 沙混色強度（B 減法相乘）：0=不混(純新色) 1=全相乘(最深)；交界沙落別色舊沙時生效
@@ -2273,11 +2284,46 @@ document.getElementById('panelTheme').querySelectorAll('.segBtn').forEach(b => {
   b.addEventListener('click', () => applyTheme(b.dataset.theme));
 });
 
-// 收藏放大燈箱：點圖卡開、點任意處關
+// 收藏放大燈箱：點圖卡開、點空白關。v66 相簿瀏覽：往右滑=下一張（往舊，翻相簿方向，用戶定義）、
+// 往左滑=上一張；桌面補方向鍵與兩側 ‹ › 箭頭；到頭停住不循環（箭頭 .off 淡出）。
+// （此功能曾被否決過，2026-07-08 用戶實際使用後翻案要做——別依舊記錄移除）
 const lightbox = document.getElementById('lightbox');
 const lightboxImg = document.getElementById('lightboxImg');
-function openLightbox(src) { lightboxImg.src = src; lightbox.classList.add('show'); }
-lightbox.addEventListener('click', () => { lightbox.classList.remove('show'); lightboxImg.src = ''; });
+const lbPrev = document.getElementById('lbPrev'), lbNext = document.getElementById('lbNext');
+let lbItems = [], lbIdx = -1, lbSwiped = false;
+function lbShow(i, dir) {                       // dir：'L'=從左滑入（上一張）'R'=從右滑入（下一張）
+  if (i < 0 || i >= lbItems.length) return;
+  lbIdx = i; lightboxImg.src = lbItems[i].thumb;
+  lightboxImg.classList.remove('inL', 'inR'); void lightboxImg.offsetWidth;   // 強制 reflow 重觸發動畫
+  if (dir) lightboxImg.classList.add(dir === 'L' ? 'inL' : 'inR');
+  lbPrev.classList.toggle('off', lbIdx <= 0);
+  lbNext.classList.toggle('off', lbIdx >= lbItems.length - 1);
+}
+function openLightbox(list, idx) { lbItems = list; lightbox.classList.add('show'); lbShow(idx); }
+function closeLightbox() { lightbox.classList.remove('show'); lightboxImg.src = ''; lbItems = []; lbIdx = -1; }
+lightbox.addEventListener('click', e => {
+  if (lbSwiped) { lbSwiped = false; return; }   // 滑動手勢收尾伴隨的 click 不當關閉
+  if (e.target === lbPrev || e.target === lbNext) return;
+  closeLightbox();
+});
+lbPrev.addEventListener('click', () => lbShow(lbIdx - 1, 'L'));
+lbNext.addEventListener('click', () => lbShow(lbIdx + 1, 'R'));
+document.addEventListener('keydown', e => {
+  if (!lightbox.classList.contains('show')) return;
+  if (e.key === 'ArrowRight') lbShow(lbIdx + 1, 'R');
+  else if (e.key === 'ArrowLeft') lbShow(lbIdx - 1, 'L');
+  else if (e.key === 'Escape') closeLightbox();
+});
+let lbTx = 0, lbTy = 0;
+lightbox.addEventListener('touchstart', e => { lbTx = e.touches[0].clientX; lbTy = e.touches[0].clientY; }, { passive: true });
+lightbox.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - lbTx, dy = e.changedTouches[0].clientY - lbTy;
+  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;   // 50px 門檻防誤觸；垂直為主的手勢不算
+  lbSwiped = true;
+  setTimeout(() => { lbSwiped = false; }, 400);   // 保險：瀏覽器若自行抑制了滑動後的 click，旗標不殘留吃掉下一次真點擊
+  if (dx > 0) lbShow(lbIdx + 1, 'L');           // 往右滑=下一張，新圖從左側滑入（跟著手指方向）
+  else lbShow(lbIdx - 1, 'R');
+}, { passive: true });
 
 // 沙子速度（面板內）：普通 1× / 快 1.6×，記憶於 localStorage
 const speedSeg = document.getElementById('panelSpeed');
@@ -2313,7 +2359,7 @@ function buildAlbum() {
   albGrid.innerHTML = '';
   const items = ALBUM.slice().sort((a, b) => b.at - a.at);   // 最新完成在前
   albEmpty.style.display = items.length ? 'none' : 'block';
-  items.forEach(item => {
+  items.forEach((item, idx) => {
     const card = document.createElement('div');
     card.className = 'albCard' + (albSel[item.id] ? ' sel' : '');
     card.dataset.id = item.id;
@@ -2324,7 +2370,7 @@ function buildAlbum() {
     chk.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
     card.appendChild(chk);
     card.addEventListener('click', () => {
-      if (!albumEl.classList.contains('editing')) { openLightbox(item.thumb); return; }   // 非編輯：點開放大檢視
+      if (!albumEl.classList.contains('editing')) { openLightbox(items, idx); return; }   // 非編輯：點開放大檢視（帶整列＝燈箱內可左右換張）
       albSel[item.id] = !albSel[item.id];
       card.classList.toggle('sel', !!albSel[item.id]);
       updateAlbSel();
